@@ -6,12 +6,17 @@ const std = @import("std");
 // for defining build steps and express dependencies between them, allowing the
 // build runner to parallelize the build automatically (and the cache system to
 // know when a step doesn't need to be re-run).
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     // Standard target options allow the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
-    const target = b.standardTargetOptions(.{});
+    const target = b.standardTargetOptions(.{
+        // .default_target = try std.Target.Query.parse(.{
+        //     .arch_os_abi = "x86_64-linux-musl",
+        // }),
+        .default_target = .{},
+    });
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
@@ -40,6 +45,9 @@ pub fn build(b: *std.Build) void {
         // which requires us to specify a target.
         .target = target,
     });
+
+    // const xdp_tools = b.dependency("xdp_tools", .{});
+    // const xdp_tools_src = xdp_tools.path("");
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
@@ -83,8 +91,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    exe.root_module.addIncludePath(b.path("xdp-tools/headers"));
-    exe.root_module.addLibraryPath(b.path("xdp-tools/lib"));
+    exe.root_module.linkSystemLibrary("xdp", .{});
+    // exe.root_module.addIncludePath(b.path("xdp-tools/headers"));
+    // exe.root_module.addLibraryPath(b.path("xdp-tools/lib"));
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
