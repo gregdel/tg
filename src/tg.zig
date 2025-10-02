@@ -12,7 +12,9 @@ pub const Tg = struct {
     socket: Socket,
 
     pub fn init(allocator: std.mem.Allocator, dev: []const u8) !Tg {
-        _ = try Sysfs.getDeviceInfo(allocator, dev);
+        const device_info = try Sysfs.getDeviceInfo(dev);
+        std.log.debug("device_info {f}", .{device_info});
+
         return .{
             .allocator = allocator,
             .pkt_size = 1500,
