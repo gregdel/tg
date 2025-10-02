@@ -1,0 +1,40 @@
+const std = @import("std");
+const Socket = @import("xsk.zig").Socket;
+const Sysfs = @import("sysfs.zig");
+
+pub const Tg = struct {
+    allocator: std.mem.Allocator,
+
+    dev: []const u8,
+    pkt_size: usize,
+    batch: usize,
+    ring_size: usize,
+    socket: Socket,
+
+    pub fn init(allocator: std.mem.Allocator, dev: []const u8) !Tg {
+        _ = try Sysfs.getDeviceInfo(allocator, dev);
+        return .{
+            .allocator = allocator,
+            .pkt_size = 1500,
+            .batch = 64,
+            .ring_size = 1024,
+            .socket = try Socket.init(allocator, dev, 0),
+            .dev = dev,
+        };
+    }
+
+    pub fn run(_: *Tg) void {
+
+        // self.socket.fill_all();
+    }
+
+    pub fn deinit(self: *Tg) void {
+        self.socket.deinit();
+        return;
+    }
+
+    pub fn print(self: *Tg) void {
+        std.log.debug("pkt_size:{d} batch:{d} ring_size:{d}", .{ self.pkt_size, self.batch, self.ring_size });
+        self.socket.print();
+    }
+};
