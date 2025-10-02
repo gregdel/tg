@@ -48,3 +48,11 @@ pub fn getDeviceInfo(dev: []const u8) !DeviceInfo {
         .addr = try macaddr(dev, buf[0..]),
     };
 }
+
+test "get device info on loopback" {
+    const device_info = try getDeviceInfo("lo");
+    // Index should be positive
+    try std.testing.expect(device_info.index > 0);
+    // Loopback typically has a zero MAC address
+    try std.testing.expectEqual(MacAddr.zero(), device_info.addr);
+}

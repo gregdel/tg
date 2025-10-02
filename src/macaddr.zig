@@ -18,6 +18,12 @@ pub const MacAddr = struct {
         return MacAddr{ .bytes = out };
     }
 
+    pub fn zero() MacAddr {
+        var addr: MacAddr = undefined;
+        @memset(&addr.bytes, 0);
+        return addr;
+    }
+
     pub fn format(self: MacAddr, writer: anytype) !void {
         try writer.print(
             "{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}",
