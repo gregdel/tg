@@ -25,9 +25,8 @@ pub const Tg = struct {
         };
     }
 
-    pub fn run(_: *Tg) void {
-
-        // self.socket.fill_all();
+    pub fn run(self: *Tg) !void {
+        try self.socket.fill_all();
     }
 
     pub fn deinit(self: *Tg) void {

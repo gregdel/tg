@@ -24,6 +24,10 @@ pub const MacAddr = struct {
         return addr;
     }
 
+    pub inline fn write(self: MacAddr, writer: *std.Io.Writer) !usize {
+        return writer.write(&self.bytes);
+    }
+
     pub fn format(self: MacAddr, writer: anytype) !void {
         try writer.print(
             "{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}",

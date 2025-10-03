@@ -14,20 +14,22 @@ const SocketError = error{
 };
 
 pub const Socket = struct {
-    fq: Xsk.xsk_ring_prod,
-    cq: Xsk.xsk_ring_cons,
-    umem: ?*Xsk.xsk_umem,
-    socket: ?*Xsk.xsk_socket,
-    tx: ?*Xsk.xsk_ring_prod,
-    umem_area: []align(page_size) u8,
     allocator: std.mem.Allocator,
 
-    umem_status: []bool,
-    entries: u16,
-    free_count: u16,
+    umem: ?*Xsk.xsk_umem,
+    socket: ?*Xsk.xsk_socket,
+    fq: Xsk.xsk_ring_prod,
+    cq: Xsk.xsk_ring_cons,
+    tx: ?*Xsk.xsk_ring_prod,
+
+    umem_area: []align(page_size) u8,
+    entries: usize,
+    idx: usize,
+    pkt_size: usize,
 
     pub fn init(allocator: std.mem.Allocator, dev: []const u8, queue_id: u32) !Socket {
         const entries = 32;
+        const pkt_size = 64;
         const ring_size = Xsk.XSK_RING_PROD__DEFAULT_NUM_DESCS;
         const size: usize = page_size * entries;
 
@@ -79,9 +81,6 @@ pub const Socket = struct {
 
         std.log.debug("xsk fd:{d}\n", .{socket_fd});
 
-        const umem_status = try allocator.alloc(bool, entries);
-        @memset(umem_status, false);
-
         return .{
             .allocator = allocator,
             .fq = fq,
@@ -90,27 +89,21 @@ pub const Socket = struct {
             .socket = socket,
             .tx = tx,
             .umem_area = addr[0..size],
-            .umem_status = umem_status,
             .entries = entries,
-            .free_count = entries,
+            .pkt_size = pkt_size,
+            .idx = 0,
         };
     }
 
-    pub fn fill_all(self: *Socket) void {
-        var addr: u64 = 0;
-        var pkt: Packet = .{
-            .data = undefined,
-            .position = undefined,
-            .id = 0,
-            .size = 64,
-        };
+    pub fn fill_all(self: *Socket) !void {
         var id: u64 = 0;
-        while (addr < self.umem_area.len) : (addr += page_size) {
-            pkt.data = self.umem_area[addr .. addr + pkt.size];
-            pkt.position = pkt.data;
-            pkt.id = id;
-            id += 1;
-            std.log.debug("addr:{any}\n", .{pkt.position.ptr});
+        while (id < self.entries) : (id += 1) {
+            const umem_idx = id % self.umem_area.len;
+            const start = umem_idx * page_size;
+            const end = start + page_size;
+            var pkt = Packet.init(id, self.umem_area[start..end]);
+            const written = try pkt.write_stuff();
+            std.log.debug("written:{any}", .{pkt.data[0..written]});
         }
     }
 

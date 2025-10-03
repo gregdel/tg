@@ -10,5 +10,5 @@ pub fn main() !void {
     defer tg.deinit();
 
     tg.print();
-    tg.run();
+    try tg.run();
 }
