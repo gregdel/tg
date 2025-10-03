@@ -31,6 +31,14 @@ pub const Packet = struct {
         ip.protocol = std.os.linux.IPPROTO.IP;
         ret += try ip.write(&w);
 
+        const udp_len: u16 = @intCast(self.data.len - ret);
+        ret += try (UdpHdr{
+            .source = 1234,
+            .dest = 5678,
+            .len = udp_len,
+            .check = 0,
+        }).write(&w);
+
         try w.flush();
         return ret;
     }
@@ -94,5 +102,20 @@ const IpHdr = struct {
         _ = try self.saddr.write(writer);
         _ = try self.daddr.write(writer);
         return @as(usize, self.ihl) * 4;
+    }
+};
+
+const UdpHdr = struct {
+    source: u16,
+    dest: u16,
+    len: u16,
+    check: u16,
+
+    pub inline fn write(self: UdpHdr, writer: *std.Io.Writer) !usize {
+        try writer.writeInt(u16, self.source, .big);
+        try writer.writeInt(u16, self.dest, .big);
+        try writer.writeInt(u16, self.len, .big);
+        try writer.writeInt(u16, self.check, .big);
+        return 2 + 2 + 2 + 2;
     }
 };
