@@ -31,7 +31,14 @@ pub const MacAddr = struct {
     pub fn format(self: MacAddr, writer: anytype) !void {
         try writer.print(
             "{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}:{x:0>2}",
-            .{ self.bytes[0], self.bytes[1], self.bytes[2], self.bytes[3], self.bytes[4], self.bytes[5] },
+            .{
+                self.bytes[0],
+                self.bytes[1],
+                self.bytes[2],
+                self.bytes[3],
+                self.bytes[4],
+                self.bytes[5],
+            },
         );
     }
 };

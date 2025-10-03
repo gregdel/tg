@@ -28,7 +28,7 @@ pub const Packet = struct {
         ip.tot_len = ip_len;
         ip.saddr = try IpAddr.parse("192.168.1.1");
         ip.daddr = try IpAddr.parse("192.168.1.2");
-        ip.protocol = std.os.linux.IPPROTO.IP;
+        ip.protocol = std.os.linux.IPPROTO.UDP;
         ret += try ip.write(&w);
 
         const udp_len: u16 = @intCast(self.data.len - ret);
@@ -62,8 +62,8 @@ const EthHdr = struct {
 };
 
 const IpHdr = struct {
-    ihl: u4,
     version: u4,
+    ihl: u4,
     tos: u8,
     tot_len: u16,
     id: u16,
@@ -91,7 +91,7 @@ const IpHdr = struct {
     }
 
     pub inline fn write(self: IpHdr, writer: *std.Io.Writer) !usize {
-        try writer.writeInt(u8, @as(u8, self.ihl) << 4 | self.version, .big);
+        try writer.writeInt(u8, @as(u8, self.version) << 4 | self.ihl, .big);
         try writer.writeInt(u8, self.tos, .big);
         try writer.writeInt(u16, self.tot_len, .big);
         try writer.writeInt(u16, self.id, .big);
