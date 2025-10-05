@@ -13,6 +13,7 @@ pub const Tg = struct {
     pub fn init(dev: []const u8) !Tg {
         const device_info = try Sysfs.getDeviceInfo(dev);
         std.log.debug("device_info {f}", .{device_info});
+        try setCpuAffinity(0);
 
         return .{
             .pkt_size = 1500,
@@ -25,10 +26,13 @@ pub const Tg = struct {
 
     pub fn run(self: *Tg) !void {
         try self.socket.fill_all();
+        var i: usize = 0;
         try signal.setup();
-        while (signal.running.load(.seq_cst)) {
+        while (signal.running) : (i += 1) {
             try self.socket.send(64);
-            try self.socket.wakeup();
+            if ((i % 10) == 0) {
+                try self.socket.wakeup();
+            }
             try self.socket.check_completed();
         }
         const stats = try self.socket.xdp_stats();
@@ -45,3 +49,10 @@ pub const Tg = struct {
         self.socket.print();
     }
 };
+
+// TODO: do this the proper way
+pub fn setCpuAffinity(cpu: u6) !void {
+    var cpu_set = std.mem.zeroes(std.os.linux.cpu_set_t);
+    cpu_set[0] = @as(usize, 1) << cpu;
+    try std.os.linux.sched_setaffinity(0, &cpu_set);
+}
