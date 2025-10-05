@@ -25,14 +25,15 @@ pub const Socket = struct {
     fd: std.posix.socket_t,
 
     umem_area: []align(page_size) u8,
-    entries: usize,
+    entries: u32,
+    pending: u32,
     idx: usize,
     pkt_size: usize,
 
     pub fn init(dev: []const u8, queue_id: u32) !Socket {
-        const entries = 32;
         const pkt_size = 64;
         const ring_size = Xsk.XSK_RING_PROD__DEFAULT_NUM_DESCS;
+        const entries = ring_size * 2;
         const size: usize = page_size * entries;
 
         const addr = try std.posix.mmap(
@@ -47,7 +48,7 @@ pub const Socket = struct {
 
         const umem_config: Xsk.xsk_umem_config = .{
             .fill_size = 0,
-            .comp_size = entries,
+            .comp_size = ring_size,
             .frame_size = page_size,
             .frame_headroom = 0,
         };
@@ -58,6 +59,7 @@ pub const Socket = struct {
         var socket: *Xsk.xsk_socket = undefined;
         var tx: Xsk.xsk_ring_prod = undefined;
 
+        // TODO use create opts
         var ret = Xsk.xsk_umem__create(
             @ptrCast(&umem),
             addr[0..size],
@@ -74,6 +76,7 @@ pub const Socket = struct {
             .unnamed_0 = .{
                 .libbpf_flags = Xsk.XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
             },
+            .bind_flags = Xsk.XDP_USE_NEED_WAKEUP,
         };
 
         ret = Xsk.xsk_socket__create(
@@ -100,6 +103,7 @@ pub const Socket = struct {
             .entries = entries,
             .pkt_size = pkt_size,
             .idx = 0,
+            .pending = 0,
         };
     }
 
@@ -114,34 +118,68 @@ pub const Socket = struct {
             const end = start + self.pkt_size;
             var pkt = Packet.init(id, self.umem_area[start..end]);
             _ = try pkt.write_stuff();
-            // const written = try pkt.write_stuff();
-            // std.log.debug("written:{any}", .{pkt.data[0..written]});
+        }
+    }
+
+    pub inline fn wakeup(self: *Socket) !void {
+        if (Xsk.xsk_ring_prod__needs_wakeup(@ptrCast(&self.tx)) == 0) {
+            return;
         }
 
-        std.log.debug("tx before: {any}", .{self.tx});
-
-        const reserved = Xsk.xsk_ring_prod__reserve(@ptrCast(&self.tx), 1, &id);
-        std.log.debug("reserved:{d} id:{d}", .{ reserved, id });
-
-        const desc = Xsk.xsk_ring_prod__tx_desc(@ptrCast(&self.tx), id);
-        if (desc == null) return error.NullDesc;
-        desc.* = .{
-            .addr = self.umem_addr(id),
-            .len = @intCast(self.pkt_size),
-            .options = 0,
+        _ = std.posix.send(
+            self.fd,
+            "",
+            std.os.linux.MSG.DONTWAIT,
+        ) catch |err| switch (err) {
+            error.WouldBlock => return,
+            else => |e| return e,
         };
-        std.log.debug("desc:{any}", .{desc.*});
+    }
 
-        Xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), 1);
+    pub inline fn check_completed(self: *Socket) !void {
+        if (self.pending == 0) return;
 
-        if (Xsk.xsk_ring_prod__needs_wakeup(@ptrCast(&self.tx)) != 0) {
-            _ = try std.posix.send(self.fd, "", std.os.linux.MSG.DONTWAIT);
+        var id: u32 = undefined;
+        const count = Xsk.xsk_ring_cons__peek(
+            @ptrCast(&self.cq),
+            self.pending,
+            &id,
+        );
+        if (count == 0) return;
+
+        // std.log.debug("completed count:{any} pending:{d}", .{
+        //     count, self.pending,
+        // });
+
+        Xsk.xsk_ring_cons__release(@ptrCast(&self.cq), count);
+        self.pending -= count;
+    }
+
+    pub fn send(self: *Socket, count: u32) !void {
+        var id: u32 = 0;
+
+        const reserved = Xsk.xsk_ring_prod__reserve(
+            @ptrCast(&self.tx),
+            count,
+            &id,
+        );
+        if (reserved != count) return; // TODO
+
+        var i: u32 = 0;
+        while (i < count) : (i += 1) {
+            const desc = Xsk.xsk_ring_prod__tx_desc(@ptrCast(&self.tx), id);
+            if (desc == null) return error.NullDesc;
+            desc.* = .{
+                .addr = self.umem_addr(id),
+                .len = @intCast(self.pkt_size),
+                .options = 0,
+            };
+            // std.log.debug("new desc id:{d} desc:{any}", .{ id, desc.* });
+            id += 1;
         }
 
-        const stats = try self.xdp_stats();
-        std.log.debug("{any}", .{stats});
-
-        std.log.debug("tx after: {any}", .{self.tx});
+        Xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), count);
+        self.pending += count;
     }
 
     pub fn xdp_stats(self: *Socket) !Xdp.xdp_statistics {

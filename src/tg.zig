@@ -1,6 +1,7 @@
 const std = @import("std");
 const Socket = @import("xsk.zig").Socket;
 const Sysfs = @import("sysfs.zig");
+const signal = @import("signal.zig");
 
 pub const Tg = struct {
     dev: []const u8,
@@ -24,6 +25,14 @@ pub const Tg = struct {
 
     pub fn run(self: *Tg) !void {
         try self.socket.fill_all();
+        try signal.setup();
+        while (signal.running.load(.seq_cst)) {
+            try self.socket.send(64);
+            try self.socket.wakeup();
+            try self.socket.check_completed();
+        }
+        const stats = try self.socket.xdp_stats();
+        std.log.debug("{any}", .{stats});
     }
 
     pub fn deinit(self: *Tg) void {
