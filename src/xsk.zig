@@ -1,11 +1,12 @@
 const std = @import("std");
 const Packet = @import("pkt.zig").Packet;
+const Config = @import("config.zig").Config;
 
-const Xsk = @cImport({
+const xsk = @cImport({
     @cInclude("xdp/xsk.h");
 });
 
-const Xdp = @cImport({
+const xdp = @cImport({
     @cInclude("linux/if_xdp.h");
 });
 
@@ -18,23 +19,18 @@ const SocketError = error{
 };
 
 pub const Socket = struct {
-    umem: *Xsk.xsk_umem,
-    socket: *Xsk.xsk_socket,
-    cq: Xsk.xsk_ring_cons,
-    tx: Xsk.xsk_ring_prod,
+    umem: *xsk.xsk_umem,
+    socket: *xsk.xsk_socket,
+    cq: xsk.xsk_ring_cons,
+    tx: xsk.xsk_ring_prod,
     fd: std.posix.socket_t,
 
+    config: Config,
     umem_area: []align(page_size) u8,
-    entries: u32,
     pending: u32,
-    idx: usize,
-    pkt_size: usize,
 
-    pub fn init(dev: []const u8, queue_id: u32) !Socket {
-        const pkt_size = 64;
-        const ring_size = Xsk.XSK_RING_PROD__DEFAULT_NUM_DESCS;
-        const entries = ring_size * 2;
-        const size: usize = page_size * entries;
+    pub fn init(config: Config, queue_id: u32) !Socket {
+        const size: usize = page_size * config.entries;
 
         const addr = try std.posix.mmap(
             null,
@@ -46,23 +42,23 @@ pub const Socket = struct {
         );
         errdefer std.posix.munmap(addr);
 
-        const umem_config: Xsk.xsk_umem_config = .{
+        const umem_config: xsk.xsk_umem_config = .{
             .fill_size = 0,
-            .comp_size = ring_size,
+            .comp_size = config.ring_size,
             .frame_size = page_size,
             .frame_headroom = 0,
         };
 
-        var fq: Xsk.xsk_ring_prod = undefined;
-        var cq: Xsk.xsk_ring_cons = undefined;
-        var umem: *Xsk.xsk_umem = undefined;
-        var socket: *Xsk.xsk_socket = undefined;
-        var tx: Xsk.xsk_ring_prod = undefined;
+        var fq: xsk.xsk_ring_prod = undefined;
+        var cq: xsk.xsk_ring_cons = undefined;
+        var umem: *xsk.xsk_umem = undefined;
+        var socket: *xsk.xsk_socket = undefined;
+        var tx: xsk.xsk_ring_prod = undefined;
 
         // TODO use create opts
-        var ret = Xsk.xsk_umem__create(
+        var ret = xsk.xsk_umem__create(
             @ptrCast(&umem),
-            addr[0..size],
+            addr.ptr,
             size,
             @ptrCast(&fq),
             @ptrCast(&cq),
@@ -70,18 +66,18 @@ pub const Socket = struct {
         );
         if (ret < 0) return SocketError.UmemCreate;
 
-        const socket_config: Xsk.xsk_socket_config = .{
+        const socket_config: xsk.xsk_socket_config = .{
             .rx_size = 0,
-            .tx_size = ring_size,
+            .tx_size = config.ring_size,
             .unnamed_0 = .{
-                .libbpf_flags = Xsk.XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
+                .libbpf_flags = xsk.XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
             },
-            .bind_flags = Xsk.XDP_USE_NEED_WAKEUP,
+            .bind_flags = xsk.XDP_USE_NEED_WAKEUP,
         };
 
-        ret = Xsk.xsk_socket__create(
+        ret = xsk.xsk_socket__create(
             @ptrCast(&socket),
-            @ptrCast(dev),
+            @ptrCast(config.dev),
             queue_id,
             @ptrCast(umem),
             null, // No consumer
@@ -90,7 +86,7 @@ pub const Socket = struct {
         );
         if (ret < 0) return SocketError.SocketCreate;
 
-        const socket_fd = Xsk.xsk_socket__fd(@ptrCast(socket));
+        const socket_fd = xsk.xsk_socket__fd(@ptrCast(socket));
         if (ret < 0) return SocketError.SocketFD;
 
         return .{
@@ -100,29 +96,27 @@ pub const Socket = struct {
             .fd = socket_fd,
             .tx = tx,
             .umem_area = addr[0..size],
-            .entries = entries,
-            .pkt_size = pkt_size,
-            .idx = 0,
             .pending = 0,
+            .config = config,
         };
     }
 
     fn umem_addr(self: *Socket, id: usize) usize {
-        return (id % self.entries) * page_size;
+        return (id % self.config.entries) * page_size;
     }
 
     pub fn fill_all(self: *Socket) !void {
         var id: u32 = 0;
-        while (id < self.entries) : (id += 1) {
+        while (id < self.config.entries) : (id += 1) {
             const start = self.umem_addr(id);
-            const end = start + self.pkt_size;
+            const end = start + self.config.pkt_size;
             var pkt = Packet.init(id, self.umem_area[start..end]);
             _ = try pkt.write_stuff();
         }
     }
 
     pub inline fn wakeup(self: *Socket) !void {
-        if (Xsk.xsk_ring_prod__needs_wakeup(@ptrCast(&self.tx)) == 0) {
+        if (xsk.xsk_ring_prod__needs_wakeup(@ptrCast(&self.tx)) == 0) {
             return;
         }
 
@@ -140,7 +134,7 @@ pub const Socket = struct {
         if (self.pending == 0) return;
 
         var id: u32 = undefined;
-        const count = Xsk.xsk_ring_cons__peek(
+        const count = xsk.xsk_ring_cons__peek(
             @ptrCast(&self.cq),
             self.pending,
             &id,
@@ -151,14 +145,14 @@ pub const Socket = struct {
         //     count, self.pending,
         // });
 
-        Xsk.xsk_ring_cons__release(@ptrCast(&self.cq), count);
+        xsk.xsk_ring_cons__release(@ptrCast(&self.cq), count);
         self.pending -= count;
     }
 
     pub fn send(self: *Socket, count: u32) !void {
         var id: u32 = 0;
 
-        const reserved = Xsk.xsk_ring_prod__reserve(
+        const reserved = xsk.xsk_ring_prod__reserve(
             @ptrCast(&self.tx),
             count,
             &id,
@@ -167,23 +161,23 @@ pub const Socket = struct {
 
         var i: u32 = 0;
         while (i < count) : (i += 1) {
-            const desc = Xsk.xsk_ring_prod__tx_desc(@ptrCast(&self.tx), id);
+            const desc = xsk.xsk_ring_prod__tx_desc(@ptrCast(&self.tx), id);
             if (desc == null) return error.NullDesc;
             desc.* = .{
                 .addr = self.umem_addr(id),
-                .len = @intCast(self.pkt_size),
+                .len = @intCast(self.config.pkt_size),
                 .options = 0,
             };
             // std.log.debug("new desc id:{d} desc:{any}", .{ id, desc.* });
             id += 1;
         }
 
-        Xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), count);
+        xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), count);
         self.pending += count;
     }
 
-    pub fn xdp_stats(self: *Socket) !Xdp.xdp_statistics {
-        var stats: Xdp.xdp_statistics = undefined;
+    pub fn xdp_stats(self: *Socket) !xdp.xdp_statistics {
+        var stats: xdp.xdp_statistics = undefined;
         try std.posix.getsockopt(
             self.fd,
             std.os.linux.SOL.XDP,

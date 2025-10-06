@@ -2,37 +2,33 @@ const std = @import("std");
 const Socket = @import("xsk.zig").Socket;
 const Sysfs = @import("sysfs.zig");
 const signal = @import("signal.zig");
+const Config = @import("config.zig").Config;
 
 pub const Tg = struct {
-    dev: []const u8,
-    pkt_size: usize,
-    batch: usize,
-    ring_size: usize,
+    config: Config,
     socket: Socket,
 
     pub fn init(dev: []const u8) !Tg {
-        const device_info = try Sysfs.getDeviceInfo(dev);
+        const config = Config.init(dev);
+
+        const device_info = try Sysfs.getDeviceInfo(config.dev);
         std.log.debug("device_info {f}", .{device_info});
+
+        // TODO: do this in the thread
         try setCpuAffinity(0);
 
         return .{
-            .pkt_size = 1500,
-            .batch = 64,
-            .ring_size = 1024,
-            .socket = try Socket.init(dev, 0),
-            .dev = dev,
+            .config = config,
+            .socket = try Socket.init(config, 0),
         };
     }
 
     pub fn run(self: *Tg) !void {
         try self.socket.fill_all();
-        var i: usize = 0;
         try signal.setup();
-        while (signal.running) : (i += 1) {
-            try self.socket.send(64);
-            if ((i % 10) == 0) {
-                try self.socket.wakeup();
-            }
+        while (signal.running) {
+            try self.socket.send(self.config.batch);
+            try self.socket.wakeup();
             try self.socket.check_completed();
         }
         const stats = try self.socket.xdp_stats();
@@ -45,7 +41,7 @@ pub const Tg = struct {
     }
 
     pub fn print(self: *Tg) void {
-        std.log.debug("pkt_size:{d} batch:{d} ring_size:{d}", .{ self.pkt_size, self.batch, self.ring_size });
+        std.log.debug("config: {any}", .{self.config});
         self.socket.print();
     }
 };
