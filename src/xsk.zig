@@ -169,7 +169,7 @@ pub const Socket = struct {
                 .options = 0,
             };
             // std.log.debug("new desc id:{d} desc:{any}", .{ id, desc.* });
-            id += 1;
+            id +%= 1;
         }
 
         xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), count);
