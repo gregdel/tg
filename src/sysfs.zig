@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const MacAddr = @import("macaddr.zig").MacAddr;
+const MacAddr = @import("macaddr.zig");
 
 const DeviceInfo = struct {
     index: u32,

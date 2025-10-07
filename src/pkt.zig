@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const MacAddr = @import("macaddr.zig").MacAddr;
-const IpAddr = @import("ip.zig").IpAddr;
+const MacAddr = @import("macaddr.zig");
+const IpAddr = @import("ip.zig");
 
 pub const Packet = struct {
     id: u64,
