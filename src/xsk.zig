@@ -1,5 +1,5 @@
 const std = @import("std");
-const Packet = @import("pkt.zig").Packet;
+const PacketBuilder = @import("pkt.zig").PacketBuilder;
 const Config = @import("config.zig").Config;
 
 const xsk = @cImport({
@@ -106,12 +106,12 @@ pub const Socket = struct {
     }
 
     pub fn fill_all(self: *Socket) !void {
+        const builder = try PacketBuilder.init(self.config.pkt_size);
         var id: u32 = 0;
         while (id < self.config.entries) : (id += 1) {
             const start = self.umem_addr(id);
             const end = start + self.config.pkt_size;
-            var pkt = Packet.init(id, self.umem_area[start..end]);
-            _ = try pkt.write_stuff();
+            _ = try builder.build(self.umem_area[start..end]);
         }
     }
 

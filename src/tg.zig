@@ -9,7 +9,7 @@ pub const Tg = struct {
     socket: Socket,
 
     pub fn init(dev: []const u8) !Tg {
-        const config = Config.init(dev);
+        const config = try Config.init(dev);
 
         const device_info = try Sysfs.getDeviceInfo(config.dev);
         std.log.debug("device_info {f}", .{device_info});

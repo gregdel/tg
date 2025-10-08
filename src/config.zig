@@ -5,7 +5,7 @@ pub const Config = struct {
     ring_size: u32,
     entries: u32,
 
-    pub fn init(dev: []const u8) Config {
+    pub fn init(dev: []const u8) !Config {
         return .{
             .dev = dev,
             .pkt_size = 64,
