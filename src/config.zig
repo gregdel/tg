@@ -1,17 +1,11 @@
-pub const Config = struct {
-    dev: []const u8,
-    pkt_size: u32,
-    batch: u32,
-    ring_size: u32,
-    entries: u32,
+dev: []const u8,
+pkt_size: u32 = 64,
+batch: u32 = 64,
+ring_size: u32 = 2048,
+entries: u32 = 2048 * 2, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
 
-    pub fn init(dev: []const u8) !Config {
-        return .{
-            .dev = dev,
-            .pkt_size = 64,
-            .batch = 64,
-            .ring_size = 2048, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
-            .entries = 2048 * 2,
-        };
-    }
-};
+const Self = @This();
+
+pub fn init(dev: []const u8) Self {
+    return .{ .dev = dev };
+}

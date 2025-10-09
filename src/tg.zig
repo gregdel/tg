@@ -2,15 +2,13 @@ const std = @import("std");
 const Socket = @import("xsk.zig").Socket;
 const Sysfs = @import("sysfs.zig");
 const signal = @import("signal.zig");
-const Config = @import("config.zig").Config;
+const Config = @import("config.zig");
 
 pub const Tg = struct {
-    config: Config,
+    config: *const Config,
     socket: Socket,
 
-    pub fn init(dev: []const u8) !Tg {
-        const config = try Config.init(dev);
-
+    pub fn init(config: *const Config) !Tg {
         const device_info = try Sysfs.getDeviceInfo(config.dev);
         std.log.debug("device_info {f}", .{device_info});
 

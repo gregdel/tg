@@ -1,6 +1,6 @@
 const std = @import("std");
 const PacketBuilder = @import("pkt.zig").PacketBuilder;
-const Config = @import("config.zig").Config;
+const Config = @import("config.zig");
 
 const xsk = @cImport({
     @cInclude("xdp/xsk.h");
@@ -25,11 +25,11 @@ pub const Socket = struct {
     tx: xsk.xsk_ring_prod,
     fd: std.posix.socket_t,
 
-    config: Config,
+    config: *const Config,
     umem_area: []align(page_size) u8,
     pending: u32,
 
-    pub fn init(config: Config, queue_id: u32) !Socket {
+    pub fn init(config: *const Config, queue_id: u32) !Socket {
         const size: usize = page_size * config.entries;
 
         const addr = try std.posix.mmap(
