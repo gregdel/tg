@@ -2,21 +2,31 @@ const std = @import("std");
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{
-        // .default_target = try std.Target.Query.parse(.{
-        //     .arch_os_abi = "x86_64-linux-musl",
-        // }),
-        .default_target = .{},
+        .default_target = .{
+            .os_tag = .linux,
+            .abi = .musl,
+        },
     });
     const optimize = b.standardOptimizeOption(.{});
+
+    const libxdp = b.dependency("libxdp", .{
+        .target = target,
+        .optimize = optimize,
+    }).artifact("xdp");
+
+    const libbpf = b.dependency("libbpf", .{
+        .target = target,
+        .optimize = optimize,
+    }).artifact("bpf");
 
     // Main module
     const mod = b.addModule("tg", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
+        .optimize = optimize,
     });
-
-    // const xdp_tools = b.dependency("xdp_tools", .{});
-    // const xdp_tools_src = xdp_tools.path("");
+    mod.linkLibrary(libxdp);
+    mod.linkLibrary(libbpf);
 
     const exe = b.addExecutable(.{
         .name = "tg",
@@ -30,20 +40,8 @@ pub fn build(b: *std.Build) !void {
             },
         }),
     });
-    exe.root_module.linkSystemLibrary("xdp", .{});
-    // exe.root_module.addIncludePath(b.path("xdp-tools/headers"));
-    // exe.root_module.addLibraryPath(b.path("xdp-tools/lib"));
+    exe.root_module.linkLibrary(libxdp);
     b.installArtifact(exe);
-
-    // Run command with arguments
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
 
     // Tests
     const mod_tests = b.addTest(.{ .root_module = mod });
