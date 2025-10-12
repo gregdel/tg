@@ -1,6 +1,6 @@
 const std = @import("std");
 const Socket = @import("xsk.zig").Socket;
-const Sysfs = @import("sysfs.zig");
+const DeviceInfo = @import("device_info.zig");
 const signal = @import("signal.zig");
 const Config = @import("config.zig");
 
@@ -9,7 +9,7 @@ pub const Tg = struct {
     socket: Socket,
 
     pub fn init(config: *const Config) !Tg {
-        const device_info = try Sysfs.getDeviceInfo(config.dev);
+        const device_info = try DeviceInfo.init(config.dev);
         std.log.debug("device_info {f}", .{device_info});
 
         // TODO: do this in the thread
