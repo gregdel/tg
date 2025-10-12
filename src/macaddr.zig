@@ -20,7 +20,7 @@ pub fn parse(s: []const u8) !MacAddr {
 }
 
 pub fn zero() MacAddr {
-    return .{ .bytes = .{0} ** @sizeOf(MacAddr.bytes) };
+    return .{ .bytes = .{0} ** 6 };
 }
 
 pub inline fn write(self: *const MacAddr, writer: *std.Io.Writer) !usize {
