@@ -4,8 +4,13 @@ const Tg = @import("tg").Tg;
 const Config = @import("tg").Config;
 
 pub fn main() !void {
-    const config = Config.init("tg0");
-    std.log.debug("Result: {any}", .{config});
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const config = try Config.init(allocator, "config.yaml");
+    defer config.deinit();
+    std.log.debug("{f}", .{config});
 
     var tg = try Tg.init(&config);
     defer tg.deinit();

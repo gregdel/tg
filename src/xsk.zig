@@ -106,7 +106,7 @@ pub const Socket = struct {
     }
 
     pub fn fill_all(self: *Socket) !void {
-        const builder = try PacketBuilder.init(self.config.pkt_size);
+        const builder = try PacketBuilder.init(self.config.layers);
         var id: u32 = 0;
         while (id < self.config.entries) : (id += 1) {
             const start = self.umem_addr(id);

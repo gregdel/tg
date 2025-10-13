@@ -1,0 +1,14 @@
+dev: tg0
+pkt_size: 1500
+layers:
+  - type: eth
+    src: de:ad:be:ef:00:01
+    dst: de:ad:be:ef:00:00
+    proto: ip
+  - type: ip
+    src: 192.168.1.1
+    dst: 192.168.1.2
+    proto: udp
+  - type: udp
+    src: 1234
+    dst: 5678

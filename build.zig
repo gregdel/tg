@@ -19,11 +19,19 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     }).artifact("bpf");
 
+    const yaml = b.dependency("yaml", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     // Main module
     const mod = b.addModule("tg", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
+        .imports = &.{
+            .{ .name = "yaml", .module = yaml.module("yaml") },
+        },
     });
     mod.linkLibrary(libxdp);
     mod.linkLibrary(libbpf);

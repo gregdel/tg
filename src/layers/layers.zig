@@ -23,6 +23,14 @@ pub const Layers = struct {
         return .{ .layers = self.layers[0..self.count] };
     }
 
+    pub fn fixSize(self: *Layers, total: u16) void {
+        var remaining = total;
+        for (self.layers[0..self.count]) |*layer| {
+            layer.setLen(remaining);
+            remaining -= layer.size();
+        }
+    }
+
     pub fn addLayer(self: *Layers, layer: Layer) !void {
         if (self.count + 1 >= MAX_LAYERS) return error.TooManyLayers;
         self.layers[self.count] = layer;
@@ -30,13 +38,8 @@ pub const Layers = struct {
     }
 
     pub fn format(self: *const Layers, writer: anytype) !void {
-        var i: u8 = 0;
-        while (i < self.count) : (i += 1) {
-            const layer = self.layers[i];
-            try writer.print("{s} -> {d} bytes\n", .{
-                layer.name(),
-                layer.size(),
-            });
+        for (self.layers[0..self.count]) |*layer| {
+            try writer.print("{s}:{f}\n", .{ layer.name(), layer });
         }
     }
 };
@@ -54,16 +57,28 @@ pub const Layer = union(enum) {
         };
     }
 
-    pub fn size(self: Layer) usize {
+    pub fn size(self: Layer) u16 {
         return switch (self) {
             .ethernet => 14,
-            .ip => @as(usize, self.ip.ihl) * 4,
+            .ip => @as(u16, self.ip.ihl) * 4,
             .udp => 8,
         };
     }
 
-    pub fn write(self: Layer, writer: anytype) !usize {
-        return switch (self) {
+    pub fn setLen(self: *Layer, len: u16) void {
+        return switch (self.*) {
+            inline else => |*layer| layer.setLen(len),
+        };
+    }
+
+    pub fn format(self: *const Layer, writer: anytype) !void {
+        return switch (self.*) {
+            inline else => |layer| try layer.format(writer),
+        };
+    }
+
+    pub fn write(self: *const Layer, writer: anytype) !usize {
+        return switch (self.*) {
             inline else => |layer| layer.write(writer),
         };
     }
@@ -74,7 +89,7 @@ pub const Ethernet = struct {
     dst: MacAddr,
     proto: u16,
 
-    pub inline fn write(self: Ethernet, writer: anytype) !usize {
+    pub inline fn write(self: *const Ethernet, writer: anytype) !usize {
         const len = @sizeOf(@This());
         var ret: usize = 0;
         ret += try self.src.write(writer);
@@ -84,13 +99,34 @@ pub const Ethernet = struct {
         if (ret != len) return error.EthHdrWrite;
         return len;
     }
+
+    pub fn setLen(_: *Ethernet, _: u16) void {}
+
+    pub fn format(self: *const Ethernet, writer: anytype) !void {
+        try writer.print("src:{f} dst:{f} proto:{d}", .{
+            self.src, self.dst, self.proto,
+        });
+    }
 };
 
+const ethProto = enum(u16) {
+    arp = std.os.linux.ETH.P.ARP,
+    ip = std.os.linux.ETH.P.IP,
+    ipv6 = std.os.linux.ETH.P.IPV6,
+};
+
+pub fn parseEthProto(input: []const u8) !u16 {
+    return if (std.meta.stringToEnum(ethProto, input)) |proto|
+        @intFromEnum(proto)
+    else
+        std.fmt.parseInt(u16, input, 10);
+}
+
 const IpHdr = struct {
-    version: u4 = 5,
-    ihl: u4 = 4,
+    version: u4 = 4,
+    ihl: u4 = 5,
     tos: u8 = 0x4,
-    tot_len: u16,
+    tot_len: u16 = 0,
     id: u16 = 0,
     frag_off: u16 = 0,
     ttl: u8 = 64,
@@ -99,7 +135,11 @@ const IpHdr = struct {
     saddr: Ip,
     daddr: Ip,
 
-    pub inline fn write(self: IpHdr, writer: anytype) !usize {
+    pub fn setLen(self: *IpHdr, len: u16) void {
+        self.tot_len = len;
+    }
+
+    pub inline fn write(self: *const IpHdr, writer: anytype) !usize {
         try writer.writeInt(u8, @as(u8, self.version) << 4 | self.ihl, .big);
         try writer.writeInt(u8, self.tos, .big);
         try writer.writeInt(u16, self.tot_len, .big);
@@ -112,19 +152,53 @@ const IpHdr = struct {
         _ = try self.daddr.write(writer);
         return @as(usize, self.ihl) * 4;
     }
+
+    pub fn format(self: *const IpHdr, writer: anytype) !void {
+        try writer.print("ip src:{f} dst:{f} tot_len:{d} proto:{d}", .{
+            self.saddr, self.daddr, self.tot_len, self.protocol,
+        });
+    }
 };
+
+const ipProto = enum(u8) {
+    ip = std.os.linux.IPPROTO.IP,
+    icmp = std.os.linux.IPPROTO.ICMP,
+    ipip = std.os.linux.IPPROTO.IPIP,
+    tcp = std.os.linux.IPPROTO.TCP,
+    udp = std.os.linux.IPPROTO.UDP,
+    ipv6 = std.os.linux.IPPROTO.IPV6,
+    gre = std.os.linux.IPPROTO.GRE,
+    icmpv6 = std.os.linux.IPPROTO.ICMPV6,
+};
+
+pub fn parseIpProto(input: []const u8) !u8 {
+    return if (std.meta.stringToEnum(ipProto, input)) |proto|
+        @intFromEnum(proto)
+    else
+        std.fmt.parseInt(u8, input, 10);
+}
 
 const Udp = struct {
     source: u16,
     dest: u16,
-    len: u16,
+    len: u16 = 0,
     check: u16 = 0,
 
-    pub inline fn write(self: Udp, writer: anytype) !usize {
+    pub fn setLen(self: *Udp, len: u16) void {
+        self.len = len;
+    }
+
+    pub inline fn write(self: *const Udp, writer: anytype) !usize {
         try writer.writeInt(u16, self.source, .big);
         try writer.writeInt(u16, self.dest, .big);
         try writer.writeInt(u16, self.len, .big);
         try writer.writeInt(u16, self.check, .big);
         return 2 + 2 + 2 + 2;
+    }
+
+    pub fn format(self: *const Udp, writer: anytype) !void {
+        try writer.print("src:{d} dst:{d} len:{d}", .{
+            self.source, self.dest, self.len,
+        });
     }
 };
