@@ -19,10 +19,10 @@ pub fn init(name: []const u8) !DeviceInfo {
 }
 
 pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
-    try writer.print(
-        "name:{s} ifindex:{d} macaddr:{f} mtu:{d}",
-        .{ self.name, self.index, self.addr, self.mtu },
-    );
+    try writer.print("{s: <13}: {s}\n", .{ "Name", self.name });
+    try writer.print("{s: <13}: {d}\n", .{ "Index", self.index });
+    try writer.print("{s: <13}: {d}\n", .{ "MTU", self.mtu });
+    try writer.print("{s: <13}: {f}\n", .{ "Address", self.addr });
 }
 
 const requestType = enum {

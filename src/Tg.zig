@@ -3,7 +3,6 @@ const std = @import("std");
 const signal = @import("signal.zig");
 const Socket = @import("Socket.zig");
 const Config = @import("Config.zig");
-const DeviceInfo = @import("DeviceInfo.zig");
 
 pub const Tg = @This();
 
@@ -12,9 +11,6 @@ socket: Socket,
 stats: Socket.XdpStats,
 
 pub fn init(config: *const Config) !Tg {
-    const device_info = try DeviceInfo.init(config.dev);
-    std.log.debug("device_info\n{f}", .{device_info});
-
     // TODO: do this in the thread
     try setCpuAffinity(0);
 
@@ -23,6 +19,11 @@ pub fn init(config: *const Config) !Tg {
         .socket = try Socket.init(config, 0),
         .stats = .{},
     };
+}
+
+pub fn deinit(self: *Tg) void {
+    self.socket.deinit();
+    return;
 }
 
 pub fn run(self: *Tg) !void {
@@ -38,11 +39,6 @@ pub fn run(self: *Tg) !void {
 
 pub fn format(self: *const Tg, writer: anytype) !void {
     try writer.print("{f}", .{self.stats});
-}
-
-pub fn deinit(self: *Tg) void {
-    self.socket.deinit();
-    return;
 }
 
 // TODO: do this the proper way
