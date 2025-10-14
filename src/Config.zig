@@ -1,14 +1,14 @@
 const std = @import("std");
+
 const Yaml = @import("yaml").Yaml;
 
-const IpAddr = @import("ip.zig");
-const MacAddr = @import("macaddr.zig");
+const IpAddr = @import("net/IpAddr.zig");
+const MacAddr = @import("net/MacAddr.zig");
 
-const layers_import = @import("layers/layers.zig");
-const Layer = layers_import.Layer;
-const Layers = layers_import.Layers;
-const Ip = @import("layers/ip.zig");
-const Eth = @import("layers/eth.zig");
+const Ip = @import("layers/Ip.zig");
+const Eth = @import("layers/Eth.zig");
+const Layers = @import("layers/Layers.zig");
+const Layer = @import("layers/layer.zig").Layer;
 
 allocator: std.mem.Allocator,
 
