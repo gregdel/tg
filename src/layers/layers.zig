@@ -1,9 +1,6 @@
 const std = @import("std");
-const MacAddr = @import("../macaddr.zig");
 
-const Udp = @import("udp.zig");
-const Ip = @import("ip.zig");
-const Eth = @import("eth.zig");
+const Layer = @import("layer.zig").Layer;
 
 const MAX_LAYERS = 8;
 
@@ -13,9 +10,9 @@ pub const Layers = struct {
 
     const Iterator = struct {
         i: usize = 0,
-        layers: []Layer,
+        layers: []const Layer,
 
-        pub fn next(self: *Iterator) ?*Layer {
+        pub fn next(self: *Iterator) ?*const Layer {
             if (self.i == self.layers.len) return null;
             defer self.i += 1;
             return &self.layers[self.i];
@@ -26,7 +23,7 @@ pub const Layers = struct {
         }
     };
 
-    pub fn iterator(self: *Layers) Iterator {
+    pub fn iterator(self: *const Layers) Iterator {
         return .{ .layers = self.layers[0..self.count] };
     }
 
@@ -48,45 +45,5 @@ pub const Layers = struct {
         for (self.layers[0..self.count]) |*layer| {
             try writer.print("{s}:{f}\n", .{ layer.name(), layer });
         }
-    }
-};
-
-pub const Layer = union(enum) {
-    eth: Eth,
-    udp: Udp,
-    ip: Ip,
-
-    pub fn name(self: Layer) []const u8 {
-        return @tagName(self);
-    }
-
-    pub fn size(self: *const Layer) u16 {
-        return switch (self.*) {
-            inline else => |layer| layer.size(),
-        };
-    }
-
-    pub fn cksum(self: *const Layer, data: []u8, seed: u16) !u16 {
-        return switch (self.*) {
-            inline else => |layer| try layer.cksum(data, seed),
-        };
-    }
-
-    pub fn setLen(self: *Layer, len: u16) void {
-        return switch (self.*) {
-            inline else => |*layer| layer.setLen(len),
-        };
-    }
-
-    pub fn format(self: *const Layer, writer: anytype) !void {
-        return switch (self.*) {
-            inline else => |layer| try layer.format(writer),
-        };
-    }
-
-    pub fn write(self: *const Layer, writer: anytype) !usize {
-        return switch (self.*) {
-            inline else => |layer| layer.write(writer),
-        };
     }
 };

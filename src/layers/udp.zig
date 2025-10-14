@@ -28,7 +28,7 @@ pub inline fn write(self: *const Udp, writer: anytype) !usize {
     try writer.writeInt(u16, self.dest, .big);
     try writer.writeInt(u16, self.len, .big);
     try writer.writeInt(u16, self.check, .big);
-    return 2 + 2 + 2 + 2;
+    return self.size();
 }
 
 pub fn format(self: *const Udp, writer: anytype) !void {

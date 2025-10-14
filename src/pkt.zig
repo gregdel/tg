@@ -8,9 +8,9 @@ const Ip = @import("ip.zig");
 const Layers = @import("layers/layers.zig").Layers;
 
 pub const PacketBuilder = struct {
-    layers: Layers,
+    layers: *const Layers,
 
-    pub fn init(layers: Layers) !PacketBuilder {
+    pub fn init(layers: *const Layers) !PacketBuilder {
         return .{
             .layers = layers,
         };
