@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const MacAddr = @import("macaddr.zig");
+const MacAddr = @import("net/MacAddr.zig");
 const DeviceInfo = @This();
 
 name: []const u8,

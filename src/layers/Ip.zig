@@ -1,8 +1,8 @@
 const std = @import("std");
 
-const IpAddr = @import("../ip.zig");
+const IpAddr = @import("../net/IpAddr.zig");
 
-const checksum = @import("checksum.zig");
+const checksum = @import("../net/checksum.zig");
 
 pub const Ip = @This();
 

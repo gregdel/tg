@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const checksum = @import("checksum.zig");
+const checksum = @import("../net/checksum.zig");
 
 pub const Udp = @This();
 

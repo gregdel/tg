@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Eth = @This();
 
-const MacAddr = @import("../macaddr.zig");
+const MacAddr = @import("../net/MacAddr.zig");
 
 src: MacAddr,
 dst: MacAddr,

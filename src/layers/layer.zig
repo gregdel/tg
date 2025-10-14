@@ -1,11 +1,11 @@
-const Udp = @import("udp.zig");
-const Ip = @import("ip.zig");
-const Eth = @import("eth.zig");
+const Eth = @import("Eth.zig");
+const Ip = @import("Ip.zig");
+const Udp = @import("Udp.zig");
 
 pub const Layer = union(enum) {
     eth: Eth,
-    udp: Udp,
     ip: Ip,
+    udp: Udp,
 
     pub fn name(self: Layer) []const u8 {
         return @tagName(self);

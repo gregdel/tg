@@ -1,43 +1,26 @@
 const std = @import("std");
 
-const cksum = @import("layers/checksum.zig");
+const cksum = @import("net/checksum.zig");
 
-const MacAddr = @import("macaddr.zig");
-const Ip = @import("ip.zig");
+const MacAddr = @import("net/MacAddr.zig");
+const IpAddr = @import("net/IpAddr.zig");
 
-const Layers = @import("layers/layers.zig").Layers;
+const Layers = @import("layers/Layers.zig");
 
-pub const PacketBuilder = struct {
-    layers: *const Layers,
+pub fn build(layers: *const Layers, buf: []u8) !usize {
+    var writer = std.Io.Writer.fixed(buf);
+    var ret: usize = 0;
+    for (layers.entries[0..layers.count]) |layer| {
+        ret += try layer.write(&writer);
+    }
+    try writer.flush();
 
-    pub fn init(layers: *const Layers) !PacketBuilder {
-        return .{
-            .layers = layers,
-        };
+    var pseudo_header: u16 = 0;
+    var pos: usize = 0;
+    for (layers.entries[0..layers.count]) |layer| {
+        pseudo_header = try layer.cksum(buf[pos..], pseudo_header);
+        pos += layer.size();
     }
 
-    pub fn build(self: *PacketBuilder, buf: []u8) !usize {
-        var writer = std.Io.Writer.fixed(buf);
-        var it = self.layers.iterator();
-        var ret: usize = 0;
-        while (it.next()) |layer| {
-            ret += try layer.write(&writer);
-        }
-        try writer.flush();
-
-        it.reset();
-        var pseudo_header: u16 = 0;
-        var pos: usize = 0;
-        while (it.next()) |layer| {
-            pseudo_header = try layer.cksum(buf[pos..], pseudo_header);
-            pos += layer.size();
-        }
-
-        return ret;
-    }
-
-    // TODO
-    pub fn show(self: *const PacketBuilder) void {
-        std.log.debug("{f}", .{self.layers});
-    }
-};
+    return ret;
+}

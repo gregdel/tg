@@ -1,10 +1,10 @@
 const std = @import("std");
 
-const Ip = @This();
+const IpAddr = @This();
 
 bytes: [4]u8,
 
-pub fn parse(s: []const u8) !Ip {
+pub fn parse(s: []const u8) !IpAddr {
     var parts = std.mem.splitScalar(u8, s, '.');
     var bytes: [4]u8 = undefined;
     var i: usize = 0;
@@ -15,18 +15,18 @@ pub fn parse(s: []const u8) !Ip {
         i += 1;
     }
     if (i != bytes.len) return error.TooFewParts;
-    return Ip{ .bytes = bytes };
+    return IpAddr{ .bytes = bytes };
 }
 
-pub fn zero() Ip {
+pub fn zero() IpAddr {
     return .{ .bytes = .{0} ** 4 };
 }
 
-pub inline fn write(self: *const Ip, writer: *std.Io.Writer) !usize {
+pub inline fn write(self: *const IpAddr, writer: *std.Io.Writer) !usize {
     return writer.write(&self.bytes);
 }
 
-pub fn format(self: *const Ip, writer: anytype) !void {
+pub fn format(self: *const IpAddr, writer: anytype) !void {
     try writer.print(
         "{d}.{d}.{d}.{d}",
         .{ self.bytes[0], self.bytes[1], self.bytes[2], self.bytes[3] },

@@ -1,20 +1,33 @@
 const std = @import("std");
 
-const Tg = @import("tg").Tg;
-const Config = @import("tg").Config;
+const Tg = @import("Tg.zig");
+const Config = @import("Config.zig");
 
 pub fn main() !void {
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
     const config = try Config.init(allocator, "config.yaml");
     defer config.deinit();
-    std.log.debug("{f}", .{config});
+    try stdout.print("{f}", .{config});
+    try stdout.flush();
 
     var tg = try Tg.init(&config);
     defer tg.deinit();
-
-    tg.print();
     try tg.run();
+
+    try stdout.print("\n{f}", .{tg});
+    try stdout.flush();
+}
+
+test {
+    _ = @import("DeviceInfo.zig");
+    _ = @import("Config.zig");
+    _ = @import("net/checksum.zig");
+    _ = @import("layers/Ip.zig");
 }
