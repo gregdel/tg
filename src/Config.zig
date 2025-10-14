@@ -30,10 +30,10 @@ const max_file_size = 100_000; // ~100ko
 pub fn init(allocator: std.mem.Allocator, filename: []const u8) !Config {
     const file_content = try std.fs.cwd().readFileAlloc(allocator, filename, max_file_size);
     defer allocator.free(file_content);
-    return initRaw(allocator, file_content);
+    return initRaw(allocator, file_content, true);
 }
 
-fn initRaw(allocator: std.mem.Allocator, source: []const u8) !Config {
+fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Config {
     var yaml: Yaml = .{ .source = source };
     defer yaml.deinit(allocator);
     try yaml.load(allocator);
@@ -42,7 +42,12 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8) !Config {
     const map = yaml.docs.items[0].map;
 
     const dev = try allocator.dupe(u8, try getValue(.string, map.get("dev")));
-    const device_info = try DeviceInfo.init(dev);
+    const device_info = if (probe) try DeviceInfo.init(dev) else DeviceInfo{
+        .name = dev,
+        .index = 0,
+        .addr = MacAddr.zero(),
+        .mtu = 1500,
+    };
 
     const layers_raw = map.get("layers") orelse return error.InvalidYaml;
     const layer_list = layers_raw.asList() orelse return error.InvalidYaml;
@@ -157,7 +162,7 @@ test "parse yaml" {
         \\    src: 1234
         \\    dst: 5678
     ;
-    var config = try initRaw(std.testing.allocator, source);
+    var config = try initRaw(std.testing.allocator, source, false);
     defer config.deinit();
 
     try std.testing.expectEqualStrings("tg0", config.dev);

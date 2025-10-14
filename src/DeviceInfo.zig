@@ -38,9 +38,8 @@ fn open(dev: []const u8, path: []const u8, buf: []u8) !usize {
 
     const file = try dir.openFile(path, .{});
     defer file.close();
-    var reader = file.reader(buf);
 
-    return try reader.read(buf);
+    return file.read(buf);
 }
 
 fn probe(dev: []const u8, comptime request: requestType, buf: []u8) !switch (request) {

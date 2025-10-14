@@ -2,7 +2,7 @@
     .name = .tg,
     .version = "0.0.0",
     .fingerprint = 0xd95c5af6c249b557,
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .libxdp = .{
             .url = "git+https://github.com/gregdel/libxdp.zig#84c543d784921273777c87d3c773e24b432f0c7c",
