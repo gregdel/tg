@@ -1,12 +1,14 @@
 const std = @import("std");
 const Yaml = @import("yaml").Yaml;
 
-const Ip = @import("ip.zig");
+const IpAddr = @import("ip.zig");
 const MacAddr = @import("macaddr.zig");
 
 const layers_import = @import("layers/layers.zig");
 const Layer = layers_import.Layer;
 const Layers = layers_import.Layers;
+const Ip = @import("layers/ip.zig");
+const Eth = @import("layers/eth.zig");
 
 allocator: std.mem.Allocator,
 
@@ -47,10 +49,10 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8) !Config {
         const layer_type = try getValue(.string, layer.get("type"));
 
         if (std.mem.eql(u8, layer_type, "eth")) {
-            try layers.addLayer(.{ .ethernet = .{
+            try layers.addLayer(.{ .eth = .{
                 .src = try MacAddr.parse(try getValue(.string, layer.get("src"))),
                 .dst = try MacAddr.parse(try getValue(.string, layer.get("dst"))),
-                .proto = try layers_import.parseEthProto(
+                .proto = try Eth.parseEthProto(
                     try getValue(.string, layer.get("proto")),
                 ),
             } });
@@ -58,9 +60,9 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8) !Config {
 
         if (std.mem.eql(u8, layer_type, "ip")) {
             try layers.addLayer(.{ .ip = .{
-                .saddr = try Ip.parse(try getValue(.string, layer.get("src"))),
-                .daddr = try Ip.parse(try getValue(.string, layer.get("dst"))),
-                .protocol = try layers_import.parseIpProto(
+                .saddr = try IpAddr.parse(try getValue(.string, layer.get("src"))),
+                .daddr = try IpAddr.parse(try getValue(.string, layer.get("dst"))),
+                .protocol = try Ip.parseIpProto(
                     try getValue(.string, layer.get("proto")),
                 ),
             } });
