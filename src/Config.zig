@@ -4,6 +4,7 @@ const Yaml = @import("yaml").Yaml;
 
 const IpAddr = @import("net/IpAddr.zig");
 const MacAddr = @import("net/MacAddr.zig");
+const DeviceInfo = @import("DeviceInfo.zig");
 
 const Ip = @import("layers/Ip.zig");
 const Eth = @import("layers/Eth.zig");
@@ -19,6 +20,7 @@ pkt_size: u16,
 batch: u32 = 64,
 ring_size: u32 = 2048,
 entries: u32 = 2048 * 2, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
+device_info: DeviceInfo,
 
 const Config = @This();
 
@@ -38,6 +40,9 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8) !Config {
 
     if (yaml.docs.items.len != 1) return error.InvalidYaml;
     const map = yaml.docs.items[0].map;
+
+    const dev = try allocator.dupe(u8, try getValue(.string, map.get("dev")));
+    const device_info = try DeviceInfo.init(dev);
 
     const layers_raw = map.get("layers") orelse return error.InvalidYaml;
     const layer_list = layers_raw.asList() orelse return error.InvalidYaml;
@@ -81,7 +86,8 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8) !Config {
 
     return .{
         .allocator = allocator,
-        .dev = try allocator.dupe(u8, try getValue(.string, map.get("dev"))),
+        .dev = dev,
+        .device_info = device_info,
         .pkt_size = pkt_size,
         .threads = 1,
         .layers = layers,
@@ -93,8 +99,15 @@ pub fn deinit(self: *const Config) void {
 }
 
 pub fn format(self: *const Config, writer: anytype) !void {
-    try writer.print("dev:{s}\n", .{self.dev});
-    try writer.print("layers:\n{f}\n", .{self.layers});
+    try writer.print("{s: <13}: \n", .{"Device info"});
+    try writer.print("{f}", .{self.device_info});
+    try writer.print("{s: <13}: {d}\n", .{ "Threads", self.threads });
+    try writer.print("{s: <13}: {d}\n", .{ "Batch", self.batch });
+    try writer.print("{s: <13}: {d}\n", .{ "Ring size", self.ring_size });
+    try writer.print("{s: <13}: {d}\n", .{ "Packet size", self.pkt_size });
+    try writer.print("{s: <13}: {d}\n", .{ "Entries", self.entries });
+    try writer.print("{s: <13}: \n", .{"Layers"});
+    try writer.print("{f}", .{self.layers});
 }
 
 const valueType = enum {

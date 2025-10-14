@@ -21,15 +21,12 @@ const SocketError = error{
 
 pub const Socket = @This();
 
-umem: *xsk.xsk_umem,
-socket: *xsk.xsk_socket,
+config: *const Config,
+pending: u32 = 0,
+umem_area: []align(page_size) u8,
 cq: xsk.xsk_ring_cons,
 tx: xsk.xsk_ring_prod,
 fd: std.posix.socket_t,
-
-config: *const Config,
-umem_area: []align(page_size) u8,
-pending: u32,
 
 pub fn init(config: *const Config, queue_id: u32) !Socket {
     const size: usize = page_size * config.entries;
@@ -93,12 +90,9 @@ pub fn init(config: *const Config, queue_id: u32) !Socket {
 
     return .{
         .cq = cq,
-        .umem = umem,
-        .socket = socket,
         .fd = socket_fd,
         .tx = tx,
         .umem_area = addr[0..size],
-        .pending = 0,
         .config = config,
     };
 }

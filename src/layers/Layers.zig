@@ -44,6 +44,6 @@ pub fn addLayer(self: *Layers, layer: Layer) !void {
 
 pub fn format(self: *const Layers, writer: anytype) !void {
     for (self.entries[0..self.count]) |*layer| {
-        try writer.print("{s}:{f}\n", .{ layer.name(), layer });
+        try writer.print("{s: >6} : {f}\n", .{ layer.name(), layer });
     }
 }
