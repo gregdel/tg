@@ -11,8 +11,8 @@ proto: u16,
 pub inline fn write(self: *const Eth, writer: anytype) !usize {
     const len = @sizeOf(@This());
     var ret: usize = 0;
-    ret += try self.src.write(writer);
     ret += try self.dst.write(writer);
+    ret += try self.src.write(writer);
     try writer.writeInt(u16, self.proto, .big);
     ret += 2;
     if (ret != len) return error.EthHdrWrite;
