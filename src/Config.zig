@@ -41,7 +41,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
     if (yaml.docs.items.len != 1) return error.InvalidYaml;
     const map = yaml.docs.items[0].map;
 
-    const dev = try allocator.dupe(u8, try getValue(.string, map.get("dev")));
+    const dev = try allocator.dupe(u8, try getValue([]const u8, map.get("dev")));
     const device_info = if (probe) try DeviceInfo.init(dev) else DeviceInfo{
         .name = dev,
         .index = 0,
@@ -56,37 +56,37 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
 
     for (layer_list) |layer_value| {
         const layer = layer_value.asMap() orelse return error.InvalidYaml;
-        const layer_type = try getValue(.string, layer.get("type"));
+        const layer_type = try getValue([]const u8, layer.get("type"));
 
         if (std.mem.eql(u8, layer_type, "eth")) {
             try layers.addLayer(.{ .eth = .{
-                .src = try MacAddr.parse(try getValue(.string, layer.get("src"))),
-                .dst = try MacAddr.parse(try getValue(.string, layer.get("dst"))),
+                .src = try MacAddr.parse(try getValue([]const u8, layer.get("src"))),
+                .dst = try MacAddr.parse(try getValue([]const u8, layer.get("dst"))),
                 .proto = try Eth.parseEthProto(
-                    try getValue(.string, layer.get("proto")),
+                    try getValue([]const u8, layer.get("proto")),
                 ),
             } });
         }
 
         if (std.mem.eql(u8, layer_type, "ip")) {
             try layers.addLayer(.{ .ip = .{
-                .saddr = try IpAddr.parse(try getValue(.string, layer.get("src"))),
-                .daddr = try IpAddr.parse(try getValue(.string, layer.get("dst"))),
+                .saddr = try IpAddr.parse(try getValue([]const u8, layer.get("src"))),
+                .daddr = try IpAddr.parse(try getValue([]const u8, layer.get("dst"))),
                 .protocol = try Ip.parseIpProto(
-                    try getValue(.string, layer.get("proto")),
+                    try getValue([]const u8, layer.get("proto")),
                 ),
             } });
         }
 
         if (std.mem.eql(u8, layer_type, "udp")) {
             try layers.addLayer(.{ .udp = .{
-                .source = try getValue(.u16, layer.get("src")),
-                .dest = try getValue(.u16, layer.get("dst")),
+                .source = try getValue(u16, layer.get("src")),
+                .dest = try getValue(u16, layer.get("dst")),
             } });
         }
     }
 
-    const pkt_size = try getValue(.optional_u16, map.get("pkt_size")) orelse default_pkt_size;
+    const pkt_size = try getValue(?u16, map.get("pkt_size")) orelse default_pkt_size;
     layers.fixSize(pkt_size);
 
     return .{
@@ -115,34 +115,23 @@ pub fn format(self: *const Config, writer: anytype) !void {
     try writer.print("{f}", .{self.layers});
 }
 
-const valueType = enum {
-    string,
-    optional_u16,
-    u16,
-};
-
-fn getValue(
-    comptime v: valueType,
-    maybe_value: ?Yaml.Value,
-) !switch (v) {
-    .string => []const u8,
-    .optional_u16 => ?u16,
-    .u16 => u16,
-} {
-    const value = maybe_value orelse return error.YamlInvalid;
-    switch (v) {
-        .string => {
-            return value.asScalar() orelse return error.YamlInvalid;
-        },
-        .optional_u16 => {
-            const scalar = value.asScalar() orelse return null;
-            return try std.fmt.parseInt(u16, scalar, 10);
-        },
-        .u16 => {
-            const scalar = value.asScalar() orelse return error.YamlInvalid;
-            return try std.fmt.parseInt(u16, scalar, 10);
-        },
+fn getValue(comptime MaybeT: type, maybe_value: ?Yaml.Value) !MaybeT {
+    const optional = @typeInfo(MaybeT) == .optional;
+    if (maybe_value == null) {
+        return if (optional) null else error.YamlInvalid;
     }
+
+    const value = maybe_value.?.asScalar() orelse return error.YamlInvalid;
+    const T = if (optional) @typeInfo(MaybeT).optional.child else MaybeT;
+
+    return switch (@typeInfo(T)) {
+        .int => try std.fmt.parseInt(T, value, 10),
+        .pointer => |info| switch (info.size) {
+            .slice => return value,
+            else => @compileError("Unsupported type for pointer"),
+        },
+        else => @compileError("Unsupported type:" ++ @typeName(T)),
+    };
 }
 
 test "parse yaml" {
@@ -166,6 +155,20 @@ test "parse yaml" {
     defer config.deinit();
 
     try std.testing.expectEqualStrings("tg0", config.dev);
-    try std.testing.expect(config.pkt_size == 1500);
-    try std.testing.expect(config.layers.count == 3);
+    try std.testing.expectEqual(1500, config.pkt_size);
+    try std.testing.expectEqual(3, config.layers.count);
+}
+
+test "parse yaml optional" {
+    const source =
+        \\dev: tg0
+        \\layers:
+        \\  - type: eth
+        \\    src: de:ad:be:ef:00:00
+        \\    dst: de:ad:be:ef:00:01
+        \\    proto: ip
+    ;
+    var config = try initRaw(std.testing.allocator, source, false);
+    defer config.deinit();
+    try std.testing.expectEqual(default_pkt_size, config.pkt_size);
 }
