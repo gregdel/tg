@@ -22,11 +22,11 @@ const SocketError = error{
 pub const Socket = @This();
 
 config: *const Config,
-pending: u32 = 0,
 umem_area: []align(page_size) u8,
 cq: xsk.xsk_ring_cons,
 tx: xsk.xsk_ring_prod,
 fd: std.posix.socket_t,
+stats: Stats,
 
 pub fn init(config: *const Config, queue_id: u32) !Socket {
     const size: usize = page_size * config.entries;
@@ -94,6 +94,7 @@ pub fn init(config: *const Config, queue_id: u32) !Socket {
         .tx = tx,
         .umem_area = addr[0..size],
         .config = config,
+        .stats = .{},
     };
 }
 
@@ -130,12 +131,12 @@ pub inline fn wakeup(self: *Socket) !void {
 }
 
 pub inline fn checkCompleted(self: *Socket) !void {
-    if (self.pending == 0) return;
+    if (self.stats.pending == 0) return;
 
     var id: u32 = undefined;
     const count = xsk.xsk_ring_cons__peek(
         @ptrCast(&self.cq),
-        self.pending,
+        self.stats.pending,
         &id,
     );
     if (count == 0) return;
@@ -145,11 +146,15 @@ pub inline fn checkCompleted(self: *Socket) !void {
     // });
 
     xsk.xsk_ring_cons__release(@ptrCast(&self.cq), count);
-    self.pending -= count;
+    self.stats.pending -= count;
+    self.stats.sent += count;
 }
 
 pub fn send(self: *Socket, count: u32) !void {
     var id: u32 = 0;
+
+    const free = xsk.xsk_prod_nb_free(@ptrCast(&self.tx), count);
+    if (free < count) return; // TODO
 
     const reserved = xsk.xsk_ring_prod__reserve(
         @ptrCast(&self.tx),
@@ -172,10 +177,14 @@ pub fn send(self: *Socket, count: u32) !void {
     }
 
     xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), count);
-    self.pending += count;
+    self.stats.pending += count;
 }
 
-pub const XdpStats = struct {
+pub const Stats = struct {
+    pending: u32 = 0,
+    sent: u64 = 0,
+
+    // AF_XDP socket stats
     rx_dropped: u64 = 0,
     rx_invalid_descs: u64 = 0,
     tx_invalid_descs: u64 = 0,
@@ -183,28 +192,20 @@ pub const XdpStats = struct {
     rx_fill_ring_empty_descs: u64 = 0,
     tx_ring_empty_descs: u64 = 0,
 
-    pub fn init(stats: *xdp.xdp_statistics) XdpStats {
-        return .{
-            .rx_dropped = stats.rx_dropped,
-            .rx_invalid_descs = stats.rx_invalid_descs,
-            .tx_invalid_descs = stats.tx_invalid_descs,
-            .rx_ring_full = stats.rx_ring_full,
-            .rx_fill_ring_empty_descs = stats.rx_fill_ring_empty_descs,
-            .tx_ring_empty_descs = stats.tx_ring_empty_descs,
-        };
-    }
-
-    pub fn format(self: *const XdpStats, writer: anytype) !void {
-        try writer.print("{s: >25}: {d}\n", .{ "rx_dropped", self.rx_dropped });
-        try writer.print("{s: >25}: {d}\n", .{ "rx_invalid_descs", self.rx_invalid_descs });
-        try writer.print("{s: >25}: {d}\n", .{ "tx_invalid_descs", self.tx_invalid_descs });
-        try writer.print("{s: >25}: {d}\n", .{ "rx_ring_full", self.rx_ring_full });
-        try writer.print("{s: >25}: {d}\n", .{ "rx_fill_ring_empty_descs", self.rx_fill_ring_empty_descs });
-        try writer.print("{s: >25}: {d}\n", .{ "tx_ring_empty_descs", self.tx_ring_empty_descs });
+    pub fn format(self: *const Stats, writer: anytype) !void {
+        const fmt = "{s: >25}: {d}\n";
+        try writer.print(fmt, .{ "pending", self.pending });
+        try writer.print(fmt, .{ "sent", self.sent });
+        try writer.print(fmt, .{ "rx_dropped", self.rx_dropped });
+        try writer.print(fmt, .{ "rx_invalid_descs", self.rx_invalid_descs });
+        try writer.print(fmt, .{ "tx_invalid_descs", self.tx_invalid_descs });
+        try writer.print(fmt, .{ "rx_ring_full", self.rx_ring_full });
+        try writer.print(fmt, .{ "rx_fill_ring_empty_descs", self.rx_fill_ring_empty_descs });
+        try writer.print(fmt, .{ "tx_ring_empty_descs", self.tx_ring_empty_descs });
     }
 };
 
-pub fn xdpStats(self: *Socket) !XdpStats {
+pub fn updateXskStats(self: *Socket) !void {
     var stats: xdp.xdp_statistics = undefined;
     try std.posix.getsockopt(
         self.fd,
@@ -212,7 +213,13 @@ pub fn xdpStats(self: *Socket) !XdpStats {
         std.os.linux.XDP.STATISTICS,
         std.mem.asBytes(&stats),
     );
-    return XdpStats.init(&stats);
+
+    self.stats.rx_dropped = stats.rx_dropped;
+    self.stats.rx_invalid_descs = stats.rx_invalid_descs;
+    self.stats.tx_invalid_descs = stats.tx_invalid_descs;
+    self.stats.rx_ring_full = stats.rx_ring_full;
+    self.stats.rx_fill_ring_empty_descs = stats.rx_fill_ring_empty_descs;
+    self.stats.tx_ring_empty_descs = stats.tx_ring_empty_descs;
 }
 
 pub fn deinit(self: *Socket) void {

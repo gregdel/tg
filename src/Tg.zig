@@ -8,7 +8,6 @@ pub const Tg = @This();
 
 config: *const Config,
 socket: Socket,
-stats: Socket.XdpStats,
 
 pub fn init(config: *const Config) !Tg {
     // TODO: do this in the thread
@@ -17,7 +16,6 @@ pub fn init(config: *const Config) !Tg {
     return .{
         .config = config,
         .socket = try Socket.init(config, 0),
-        .stats = .{},
     };
 }
 
@@ -30,15 +28,22 @@ pub fn run(self: *Tg) !void {
     try self.socket.fillAll();
     try signal.setup();
     while (signal.running) {
-        try self.socket.send(self.config.batch);
+        if (self.config.count) |limit| {
+            const remaining = limit - self.socket.stats.sent;
+            if (remaining == 0) break;
+            try self.socket.send(@min(self.config.batch, remaining));
+        } else {
+            try self.socket.send(self.config.batch);
+        }
+
         try self.socket.wakeup();
         try self.socket.checkCompleted();
     }
-    self.stats = try self.socket.xdpStats();
+    try self.socket.updateXskStats();
 }
 
 pub fn format(self: *const Tg, writer: anytype) !void {
-    try writer.print("{f}", .{self.stats});
+    try writer.print("{f}", .{self.socket.stats});
 }
 
 // TODO: do this the proper way
