@@ -40,3 +40,13 @@ pub fn format(self: *const MacAddr, writer: anytype) !void {
         },
     );
 }
+
+pub fn fromInt(value: u64) MacAddr {
+    var mac = MacAddr.zero();
+    std.mem.writeInt(u48, &mac.bytes, @truncate(value), .big);
+    return mac;
+}
+
+pub fn toInt(self: *const MacAddr) u64 {
+    return @as(u64, std.mem.readInt(u48, &self.bytes, .big));
+}

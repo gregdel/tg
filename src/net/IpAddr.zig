@@ -32,3 +32,20 @@ pub fn format(self: *const IpAddr, writer: anytype) !void {
         .{ self.bytes[0], self.bytes[1], self.bytes[2], self.bytes[3] },
     );
 }
+
+pub fn fromInt(value: u64) IpAddr {
+    var ip = IpAddr.zero();
+    std.mem.writeInt(u32, &ip.bytes, @truncate(value), .big);
+    return ip;
+}
+
+pub fn toInt(self: *const IpAddr) u64 {
+    return @as(u64, std.mem.readInt(u32, &self.bytes, .big));
+}
+
+test "parse ip" {
+    const ip = try IpAddr.parse("192.168.1.1");
+    const value = ip.toInt();
+    const other = IpAddr.fromInt(value);
+    try std.testing.expectEqual(ip, other);
+}

@@ -29,5 +29,7 @@ test {
     _ = @import("DeviceInfo.zig");
     _ = @import("Config.zig");
     _ = @import("net/checksum.zig");
+    _ = @import("net/IpAddr.zig");
     _ = @import("layers/Ip.zig");
+    _ = @import("range.zig");
 }
