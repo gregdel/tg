@@ -19,6 +19,7 @@ dev: []const u8,
 threads: u32,
 pkt_size: u16,
 batch: u32,
+count: ?u64,
 ring_size: u32 = 2048,
 entries: u32 = 2048 * 2, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
 device_info: DeviceInfo,
@@ -96,6 +97,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
         .device_info = device_info,
         .pkt_size = pkt_size,
         .threads = 1,
+        .count = try getValue(?u64, map.get("count")),
         .batch = try getValue(?u16, map.get("batch")) orelse default_batch,
         .layers = layers,
     };
@@ -113,6 +115,9 @@ pub fn format(self: *const Config, writer: anytype) !void {
     try writer.print("{s: <13}: {d}\n", .{ "Ring size", self.ring_size });
     try writer.print("{s: <13}: {d}\n", .{ "Packet size", self.pkt_size });
     try writer.print("{s: <13}: {d}\n", .{ "Entries", self.entries });
+    if (self.count != null) {
+        try writer.print("{s: <13}: {d}\n", .{ "Count", self.count.? });
+    }
     try writer.print("{s: <13}: \n", .{"Layers"});
     try writer.print("{f}", .{self.layers});
 }
@@ -130,7 +135,7 @@ fn getValue(comptime MaybeT: type, maybe_value: ?Yaml.Value) !MaybeT {
         .int => try std.fmt.parseInt(T, value, 10),
         .pointer => |info| switch (info.size) {
             .slice => return value,
-            else => @compileError("Unsupported type for pointer"),
+            else => @compileError("Unsupported pointer type " ++ @tagName(info.size)),
         },
         else => @compileError("Unsupported type:" ++ @typeName(T)),
     };
@@ -155,6 +160,7 @@ test "parse yaml" {
         \\dev: tg0
         \\pkt_size: 1500
         \\batch: 256
+        \\count: 1024
         \\layers:
         \\  - type: eth
         \\    src: de:ad:be:ef:00:00
@@ -174,6 +180,7 @@ test "parse yaml" {
     try std.testing.expectEqualStrings("tg0", config.dev);
     try std.testing.expectEqual(1500, config.pkt_size);
     try std.testing.expectEqual(256, config.batch);
+    try std.testing.expectEqual(1024, config.count);
     try std.testing.expectEqual(3, config.layers.count);
 }
 
