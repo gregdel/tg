@@ -17,7 +17,7 @@ layers: Layers,
 dev: []const u8,
 threads: u32,
 pkt_size: u16,
-batch: u32 = 64,
+batch: u32,
 ring_size: u32 = 2048,
 entries: u32 = 2048 * 2, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
 device_info: DeviceInfo,
@@ -25,6 +25,7 @@ device_info: DeviceInfo,
 const Config = @This();
 
 const default_pkt_size = 64;
+const default_batch = 64;
 const max_file_size = 100_000; // ~100ko
 
 pub fn init(allocator: std.mem.Allocator, filename: []const u8) !Config {
@@ -95,6 +96,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
         .device_info = device_info,
         .pkt_size = pkt_size,
         .threads = 1,
+        .batch = try getValue(?u16, map.get("batch")) orelse default_batch,
         .layers = layers,
     };
 }
@@ -138,6 +140,7 @@ test "parse yaml" {
     const source =
         \\dev: tg0
         \\pkt_size: 1500
+        \\batch: 256
         \\layers:
         \\  - type: eth
         \\    src: de:ad:be:ef:00:00
@@ -156,6 +159,7 @@ test "parse yaml" {
 
     try std.testing.expectEqualStrings("tg0", config.dev);
     try std.testing.expectEqual(1500, config.pkt_size);
+    try std.testing.expectEqual(256, config.batch);
     try std.testing.expectEqual(3, config.layers.count);
 }
 
@@ -171,4 +175,5 @@ test "parse yaml optional" {
     var config = try initRaw(std.testing.allocator, source, false);
     defer config.deinit();
     try std.testing.expectEqual(default_pkt_size, config.pkt_size);
+    try std.testing.expectEqual(default_batch, config.batch);
 }
