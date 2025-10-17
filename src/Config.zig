@@ -43,11 +43,10 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
     const map = yaml.docs.items[0].map;
 
     const dev = try allocator.dupe(u8, try getValue([]const u8, map.get("dev")));
+    errdefer allocator.free(dev);
+
     const device_info = if (probe) try DeviceInfo.init(dev) else DeviceInfo{
         .name = dev,
-        .index = 0,
-        .addr = MacAddr.zero(),
-        .mtu = 1500,
     };
 
     const layers_raw = map.get("layers") orelse return error.InvalidYaml;

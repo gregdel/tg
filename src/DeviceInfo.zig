@@ -4,9 +4,9 @@ const MacAddr = @import("net/MacAddr.zig");
 const DeviceInfo = @This();
 
 name: []const u8,
-index: u32,
-mtu: u32,
-addr: MacAddr,
+index: u32 = 0,
+mtu: u32 = 1500,
+addr: MacAddr = MacAddr.zero(),
 
 pub fn init(name: []const u8) !DeviceInfo {
     var buf: [64]u8 = undefined;
