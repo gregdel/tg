@@ -3,6 +3,14 @@ const std = @import("std");
 const Tg = @import("Tg.zig");
 const Config = @import("Config.zig");
 
+// Disable YAML parsing logs
+pub const std_options: std.Options = .{
+    .log_scope_levels = &[_]std.log.ScopeLevel{
+        .{ .scope = .parser, .level = .err },
+        .{ .scope = .tokenizer, .level = .err },
+    },
+};
+
 pub fn main() !void {
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
