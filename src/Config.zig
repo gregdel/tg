@@ -44,15 +44,16 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
     if (yaml.docs.items.len != 1) return error.InvalidYaml;
     const map = yaml.docs.items[0].map;
 
-    const dev = try allocator.dupe(u8, try getValue([]const u8, map.get("dev")));
+    const yaml_dev = getValue([]const u8, map.get("dev")) catch return error.ConfigMissingDev;
+    const dev = try allocator.dupe(u8, yaml_dev);
     errdefer allocator.free(dev);
 
     const device_info = if (probe) try DeviceInfo.init(dev) else DeviceInfo{
         .name = dev,
     };
 
-    const layers_raw = map.get("layers") orelse return error.InvalidYaml;
-    const layer_list = layers_raw.asList() orelse return error.InvalidYaml;
+    const layers_raw = map.get("layers") orelse return error.ConfigMissingLayers;
+    const layer_list = layers_raw.asList() orelse return error.ConfigMissingLayers;
 
     var layers = Layers{};
 

@@ -4,18 +4,20 @@ const MacAddr = @This();
 
 bytes: [6]u8,
 
+pub const ParseError = error.ParseError;
+
 pub fn parse(s: []const u8) !MacAddr {
     var parts = std.mem.splitScalar(u8, s, ':');
     var out: [6]u8 = undefined;
     var i: usize = 0;
 
     while (parts.next()) |part| {
-        if (i >= out.len) return error.TooManyParts;
-        if (part.len != 2) return error.InvalidPart;
+        if (i >= out.len) return ParseError;
+        if (part.len != 2) return ParseError;
         out[i] = try std.fmt.parseInt(u8, part, 16);
         i += 1;
     }
-    if (i != out.len) return error.TooFewParts;
+    if (i != out.len) return ParseError;
     return MacAddr{ .bytes = out };
 }
 
