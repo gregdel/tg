@@ -5,6 +5,7 @@ const IpAddr = @import("net/IpAddr.zig");
 
 const RangeError = error{
     EndBeforeStart,
+    ParseError,
 };
 
 pub fn Range(comptime T: type) type {
@@ -12,10 +13,13 @@ pub fn Range(comptime T: type) type {
         start: T,
         end: ?T,
 
-        pub fn init(start: T, end: T) RangeError!Range(T) {
-            const start_64: u64 = toInt(start);
-            const end_64: u64 = toInt(end);
-            if (start_64 > end_64) return RangeError.EndBeforeStart;
+        pub fn init(start: T, end: ?T) RangeError!Range(T) {
+            if (end) |end_value| {
+                const start_64: u64 = toInt(start);
+                const end_64: u64 = toInt(end_value);
+                if (start_64 > end_64) return RangeError.EndBeforeStart;
+            }
+
             return .{
                 .start = start,
                 .end = end,
@@ -36,7 +40,7 @@ pub fn Range(comptime T: type) type {
                 else => switch (T) {
                     MacAddr => MacAddr.fromInt(value),
                     IpAddr => IpAddr.fromInt(value),
-                    else => unreachable,
+                    else => @compileError("Unsupported type:" ++ @typeName(T)),
                 },
             };
         }
@@ -47,9 +51,39 @@ pub fn Range(comptime T: type) type {
                 else => switch (T) {
                     MacAddr => value.toInt(),
                     IpAddr => value.toInt(),
-                    else => unreachable,
+                    else => @compileError("Unsupported type:" ++ @typeName(T)),
                 },
             };
+        }
+
+        pub fn parse(input: []const u8) RangeError!Range(T) {
+            var parts = std.mem.splitScalar(u8, input, '-');
+            var from: T = undefined;
+            var to: ?T = null;
+
+            var i: usize = 0;
+            while (parts.next()) |part| {
+                if (i == 2) return error.ParseError;
+                const value = switch (@typeInfo(T)) {
+                    .int => std.fmt.parseInt(u8, part, 10),
+                    else => switch (T) {
+                        MacAddr => MacAddr.parse(part),
+                        IpAddr => IpAddr.parse(part),
+                        else => @compileError("Unsupported type:" ++ @typeName(T)),
+                    },
+                };
+
+                if (value) |v| {
+                    if (i == 0) from = v;
+                    if (i == 1) to = v;
+                } else |_| {
+                    return error.ParseError;
+                }
+                i += 1;
+            }
+            if (i == 0) return error.ParseError;
+
+            return Range(T).init(from, to);
         }
     };
 }
@@ -73,6 +107,35 @@ test "range of MacAddr" {
     const result = macaddr_range.get(2);
     const expected = try MacAddr.parse("de:ad:be:ef:00:02");
     try std.testing.expectEqualSlices(u8, &expected.bytes, &result.bytes);
+}
+
+test "parse range of MacAddr" {
+    const expected = try Range(MacAddr).init(
+        try MacAddr.parse("de:ad:be:ef:00:00"),
+        try MacAddr.parse("de:ad:be:ef:00:ff"),
+    );
+
+    const result = try Range(MacAddr).parse("de:ad:be:ef:00:00-de:ad:be:ef:00:ff");
+    try std.testing.expectEqual(expected, result);
+}
+
+test "parse range with single value" {
+    const u16_range = try Range(u16).parse("42");
+    try std.testing.expectEqual(u16_range.start, 42);
+    try std.testing.expectEqual(u16_range.end, null);
+}
+
+test "parse invalid range" {
+    const inputs: []const []const u8 = &.{
+        "0-1-1",
+        "0-",
+        "x",
+        "",
+    };
+    for (inputs) |input| {
+        const result = Range(u16).parse(input);
+        try std.testing.expectEqual(result, RangeError.ParseError);
+    }
 }
 
 test "range of ip" {
