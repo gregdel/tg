@@ -1,11 +1,12 @@
 const std = @import("std");
 
 const checksum = @import("../net/checksum.zig");
+const PortRange = @import("../range.zig").Range(u16);
 
 pub const Udp = @This();
 
-source: u16,
-dest: u16,
+source: PortRange,
+dest: PortRange,
 len: u16 = 0,
 check: u16 = 0,
 
@@ -23,16 +24,19 @@ pub fn cksum(_: *const Udp, data: []u8, seed: u16) !u16 {
     return 0;
 }
 
-pub inline fn write(self: *const Udp, writer: anytype) !usize {
-    try writer.writeInt(u16, self.source, .big);
-    try writer.writeInt(u16, self.dest, .big);
+pub inline fn write(self: *const Udp, writer: anytype, seed: u64) !usize {
+    const source = self.source.get(seed);
+    const dest = self.dest.get(seed);
+
+    try writer.writeInt(u16, source, .big);
+    try writer.writeInt(u16, dest, .big);
     try writer.writeInt(u16, self.len, .big);
     try writer.writeInt(u16, self.check, .big);
     return self.size();
 }
 
 pub fn format(self: *const Udp, writer: anytype) !void {
-    try writer.print("src:{d} dst:{d} len:{d}", .{
+    try writer.print("src:{f} dst:{f} len:{d}", .{
         self.source, self.dest, self.len,
     });
 }

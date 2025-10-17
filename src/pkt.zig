@@ -7,11 +7,11 @@ const IpAddr = @import("net/IpAddr.zig");
 
 const Layers = @import("layers/Layers.zig");
 
-pub fn build(layers: *const Layers, buf: []u8) !usize {
+pub fn build(layers: *const Layers, buf: []u8, seed: u64) !usize {
     var writer = std.Io.Writer.fixed(buf);
     var ret: usize = 0;
     for (layers.entries[0..layers.count]) |layer| {
-        ret += try layer.write(&writer);
+        ret += try layer.write(&writer, seed);
     }
     try writer.flush();
 

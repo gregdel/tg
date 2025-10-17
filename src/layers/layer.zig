@@ -35,9 +35,9 @@ pub const Layer = union(enum) {
         };
     }
 
-    pub fn write(self: *const Layer, writer: anytype) !usize {
+    pub fn write(self: *const Layer, writer: anytype, seed: u64) !usize {
         return switch (self.*) {
-            inline else => |layer| layer.write(writer),
+            inline else => |layer| layer.write(writer, seed),
         };
     }
 };

@@ -65,7 +65,7 @@ pub fn Range(comptime T: type) type {
             while (parts.next()) |part| {
                 if (i == 2) return error.ParseError;
                 const value = switch (@typeInfo(T)) {
-                    .int => std.fmt.parseInt(u8, part, 10),
+                    .int => std.fmt.parseInt(T, part, 10),
                     else => switch (T) {
                         MacAddr => MacAddr.parse(part),
                         IpAddr => IpAddr.parse(part),
@@ -84,6 +84,18 @@ pub fn Range(comptime T: type) type {
             if (i == 0) return error.ParseError;
 
             return Range(T).init(from, to);
+        }
+
+        pub fn format(self: *const Range(T), writer: anytype) !void {
+            const fmt = if (@typeInfo(T) == .int) "{d}" else "{f}";
+            if (self.end) |end| {
+                try writer.print(
+                    "[" ++ fmt ++ " -> " ++ fmt ++ "]",
+                    .{ self.start, end },
+                );
+            } else {
+                try writer.print(fmt, .{self.start});
+            }
         }
     };
 }
@@ -123,6 +135,12 @@ test "parse range with single value" {
     const u16_range = try Range(u16).parse("42");
     try std.testing.expectEqual(u16_range.start, 42);
     try std.testing.expectEqual(u16_range.end, null);
+}
+
+test "parse range of u16" {
+    const u16_range = try Range(u16).parse("1000-2000");
+    try std.testing.expectEqual(u16_range.start, 1000);
+    try std.testing.expectEqual(u16_range.end, 2000);
 }
 
 test "parse invalid range" {

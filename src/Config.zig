@@ -4,6 +4,7 @@ const Yaml = @import("yaml").Yaml;
 
 const IpAddr = @import("net/IpAddr.zig");
 const MacAddr = @import("net/MacAddr.zig");
+const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
 
 const Ip = @import("layers/Ip.zig");
@@ -60,8 +61,8 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
 
         if (std.mem.eql(u8, layer_type, "eth")) {
             try layers.addLayer(.{ .eth = .{
-                .src = try MacAddr.parse(try getValue([]const u8, layer.get("src"))),
-                .dst = try MacAddr.parse(try getValue([]const u8, layer.get("dst"))),
+                .src = try Range(MacAddr).parse(try getValue([]const u8, layer.get("src"))),
+                .dst = try Range(MacAddr).parse(try getValue([]const u8, layer.get("dst"))),
                 .proto = try Eth.parseEthProto(
                     try getValue([]const u8, layer.get("proto")),
                 ),
@@ -70,8 +71,8 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
 
         if (std.mem.eql(u8, layer_type, "ip")) {
             try layers.addLayer(.{ .ip = .{
-                .saddr = try IpAddr.parse(try getValue([]const u8, layer.get("src"))),
-                .daddr = try IpAddr.parse(try getValue([]const u8, layer.get("dst"))),
+                .saddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("src"))),
+                .daddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("dst"))),
                 .protocol = try Ip.parseIpProto(
                     try getValue([]const u8, layer.get("proto")),
                 ),
@@ -80,8 +81,8 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
 
         if (std.mem.eql(u8, layer_type, "udp")) {
             try layers.addLayer(.{ .udp = .{
-                .source = try getValue(u16, layer.get("src")),
-                .dest = try getValue(u16, layer.get("dst")),
+                .source = try getIntRangeValue(u16, layer.get("src")),
+                .dest = try getIntRangeValue(u16, layer.get("dst")),
             } });
         }
     }
@@ -133,6 +134,20 @@ fn getValue(comptime MaybeT: type, maybe_value: ?Yaml.Value) !MaybeT {
         },
         else => @compileError("Unsupported type:" ++ @typeName(T)),
     };
+}
+
+fn getIntRangeValue(comptime T: type, maybe_value: ?Yaml.Value) !Range(T) {
+    if (@typeInfo(T) != .int) {
+        @compileError("This function only handles intergers");
+    }
+
+    // First try to parse the value as type T. If this fails, parse it as a
+    // range from a string.
+    if (getValue(T, maybe_value)) |value| {
+        return try Range(T).init(value, null);
+    } else |_| {
+        return try Range(T).parse(try getValue([]const u8, maybe_value));
+    }
 }
 
 test "parse yaml" {

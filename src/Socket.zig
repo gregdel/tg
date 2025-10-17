@@ -102,13 +102,14 @@ fn umemAddr(self: *Socket, id: usize) usize {
 }
 
 pub fn fillAll(self: *Socket) !void {
-    var id: u32 = 0;
+    var id: u64 = 0;
     while (id < self.config.entries) : (id += 1) {
         const start = self.umemAddr(id);
         const end = start + self.config.pkt_size;
         _ = try pkt.build(
             &self.config.layers,
             self.umem_area[start..end],
+            id,
         );
     }
 }

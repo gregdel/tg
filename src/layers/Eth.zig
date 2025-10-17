@@ -3,23 +3,22 @@ const std = @import("std");
 const Eth = @This();
 
 const MacAddr = @import("../net/MacAddr.zig");
+const Range = @import("../range.zig").Range;
 
-src: MacAddr,
-dst: MacAddr,
+src: Range(MacAddr),
+dst: Range(MacAddr),
 proto: u16,
 
-pub inline fn write(self: *const Eth, writer: anytype) !usize {
-    const len = @sizeOf(@This());
-    var ret: usize = 0;
-    ret += try self.dst.write(writer);
-    ret += try self.src.write(writer);
+pub inline fn write(self: *const Eth, writer: anytype, seed: u64) !usize {
+    const src = self.src.get(seed);
+    const dst = self.dst.get(seed);
+    _ = try dst.write(writer);
+    _ = try src.write(writer);
     try writer.writeInt(u16, self.proto, .big);
-    ret += 2;
-    if (ret != len) return error.EthHdrWrite;
-    return len;
+    return self.size();
 }
 
-pub inline fn size(_: *const Eth) u16 {
+pub fn size(_: *const Eth) u16 {
     return 14;
 }
 
