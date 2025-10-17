@@ -120,14 +120,17 @@ pub inline fn wakeup(self: *Socket) !void {
         return;
     }
 
-    _ = std.posix.send(
-        self.fd,
-        "",
-        std.os.linux.MSG.DONTWAIT,
-    ) catch |err| switch (err) {
-        error.WouldBlock => return,
-        else => |e| return e,
-    };
+    while (true) {
+        _ = std.posix.send(
+            self.fd,
+            "",
+            std.os.linux.MSG.DONTWAIT,
+        ) catch |err| switch (err) {
+            error.WouldBlock => continue,
+            else => |e| return e,
+        };
+        break;
+    }
 }
 
 pub inline fn checkCompleted(self: *Socket) !void {
