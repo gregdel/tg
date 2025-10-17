@@ -10,11 +10,20 @@ addr: MacAddr = MacAddr.zero(),
 
 pub fn init(name: []const u8) !DeviceInfo {
     var buf: [64]u8 = undefined;
-    return .{
+    const info: anyerror!DeviceInfo = .{
         .name = name,
-        .index = try probe(name, .ifindex, &buf),
-        .addr = try probe(name, .address, &buf),
-        .mtu = try probe(name, .mtu, &buf),
+        .index = try parse(u32, name, "ifindex", &buf),
+        .addr = try parse(MacAddr, name, "address", &buf),
+        .mtu = try parse(u32, name, "mtu", &buf),
+    };
+
+    if (info) |value| {
+        return value;
+    } else |err| return switch (err) {
+        error.FileNotFound => error.DeviceNotFound,
+        error.Overflow, error.InvalidCharacter => error.DeviceParse,
+        MacAddr.ParseError => error.DeciceMacAddrParse,
+        else => err,
     };
 }
 
@@ -24,12 +33,6 @@ pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
     try writer.print("{s: <13}: {d}\n", .{ "MTU", self.mtu });
     try writer.print("{s: <13}: {f}\n", .{ "Address", self.addr });
 }
-
-const requestType = enum {
-    ifindex,
-    mtu,
-    address,
-};
 
 fn open(dev: []const u8, path: []const u8, buf: []u8) !usize {
     const device_path = try std.fmt.bufPrint(buf, "/sys/class/net/{s}/", .{dev});
@@ -42,16 +45,16 @@ fn open(dev: []const u8, path: []const u8, buf: []u8) !usize {
     return file.read(buf);
 }
 
-fn probe(dev: []const u8, comptime request: requestType, buf: []u8) !switch (request) {
-    .ifindex, .mtu => u32,
-    .address => MacAddr,
-} {
-    const read = try open(dev, @tagName(request), buf);
-    if (read < 2) return error.ProbeError;
+fn parse(comptime T: type, dev: []const u8, name: []const u8, buf: []u8) !T {
+    const read = try open(dev, name, buf);
+    if (read < 2) return error.DeviceParse;
     const end = read - 1;
-    return switch (request) {
-        .ifindex, .mtu => std.fmt.parseInt(u32, buf[0..end], 10),
-        .address => MacAddr.parse(buf[0..end]),
+    return switch (@typeInfo(T)) {
+        .int => std.fmt.parseInt(u32, buf[0..end], 10),
+        else => switch (T) {
+            MacAddr => MacAddr.parse(buf[0..end]),
+            else => @compileError("Unsupported type:" ++ @typeName(T)),
+        },
     };
 }
 

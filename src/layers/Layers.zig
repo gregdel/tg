@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Layer = @import("layer.zig").Layer;
 
-const max_layers = 8;
+pub const max_layers = 8;
 
 pub const Layers = @This();
 
