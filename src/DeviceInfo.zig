@@ -9,21 +9,23 @@ mtu: u32 = 1500,
 addr: MacAddr = MacAddr.zero(),
 
 pub fn init(name: []const u8) !DeviceInfo {
-    var buf: [64]u8 = undefined;
-    const info: anyerror!DeviceInfo = .{
-        .name = name,
-        .index = try parse(u32, name, "ifindex", &buf),
-        .addr = try parse(MacAddr, name, "address", &buf),
-        .mtu = try parse(u32, name, "mtu", &buf),
-    };
-
-    if (info) |value| {
+    if (parseFiles(name)) |value| {
         return value;
     } else |err| return switch (err) {
         error.FileNotFound => error.DeviceNotFound,
         error.Overflow, error.InvalidCharacter => error.DeviceParse,
         MacAddr.ParseError => error.DeciceMacAddrParse,
         else => err,
+    };
+}
+
+fn parseFiles(name: []const u8) !DeviceInfo {
+    var buf: [64]u8 = undefined;
+    return .{
+        .name = name,
+        .index = try parse(u32, name, "ifindex", &buf),
+        .addr = try parse(MacAddr, name, "address", &buf),
+        .mtu = try parse(u32, name, "mtu", &buf),
     };
 }
 
