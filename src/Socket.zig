@@ -86,7 +86,7 @@ pub fn init(config: *const Config, queue_id: u32) !Socket {
     if (ret < 0) return SocketError.SocketCreate;
 
     const socket_fd = xsk.xsk_socket__fd(@ptrCast(socket));
-    if (ret < 0) return SocketError.SocketFD;
+    if (socket_fd < 0) return SocketError.SocketFD;
 
     return .{
         .cq = cq,
