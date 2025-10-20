@@ -22,13 +22,12 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var config = Config.init(allocator, "config.yaml") catch |err| return exitError(err);
+    const config = Config.init(allocator, "config.yaml") catch |err| return exitError(err);
     defer config.deinit();
     try stdout.print("{f}", .{config});
     try stdout.flush();
 
     var tg = try Tg.init(&config);
-    defer tg.deinit();
     try tg.run();
 
     try stdout.print("\n{f}", .{tg});
