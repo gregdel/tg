@@ -1,10 +1,10 @@
 const std = @import("std");
 
-pub var running = true;
+pub var running = std.atomic.Value(bool).init(true);
 
 fn handleSignal(sig: i32) callconv(.c) void {
     _ = sig;
-    running = false;
+    running.store(false, .release);
 }
 
 pub fn setup() !void {

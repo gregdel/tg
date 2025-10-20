@@ -3,6 +3,7 @@ const std = @import("std");
 const pkt = @import("pkt.zig");
 const Config = @import("Config.zig");
 const CpuSet = @import("CpuSet.zig");
+const Stats = @import("Stats.zig");
 
 const xsk = @cImport({
     @cInclude("xdp/xsk.h");
@@ -27,13 +28,18 @@ umem_area: []align(page_size) u8,
 cq: xsk.xsk_ring_cons,
 tx: xsk.xsk_ring_prod,
 fd: std.posix.socket_t,
-stats: Stats,
+stats: *Stats,
 
-pub fn init(config: *const Config, queue_id: u32) !Socket {
+pub fn init(config: *const Config, queue_id: u32, stats: *Stats) !Socket {
     // Bind the thread to the proper CPU
     var cpu_set = config.device_info.queues[queue_id] orelse CpuSet.zero();
     if (cpu_set.isEmpty()) {
-        cpu_set.setFallback(queue_id + 1);
+        const cpu = queue_id;
+        cpu_set.setFallback(cpu);
+        std.log.debug(
+            "cpu_set empty queue:{d} is falling back to cpu:{d}",
+            .{ queue_id, cpu },
+        );
     }
     try cpu_set.apply();
 
@@ -102,7 +108,7 @@ pub fn init(config: *const Config, queue_id: u32) !Socket {
         .tx = tx,
         .umem_area = addr[0..size],
         .config = config,
-        .stats = .{},
+        .stats = stats,
     };
 }
 
@@ -190,31 +196,6 @@ pub fn send(self: *Socket, count: u32) !void {
     xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), count);
     self.stats.pending += count;
 }
-
-pub const Stats = struct {
-    pending: u32 = 0,
-    sent: u64 = 0,
-
-    // AF_XDP socket stats
-    rx_dropped: u64 = 0,
-    rx_invalid_descs: u64 = 0,
-    tx_invalid_descs: u64 = 0,
-    rx_ring_full: u64 = 0,
-    rx_fill_ring_empty_descs: u64 = 0,
-    tx_ring_empty_descs: u64 = 0,
-
-    pub fn format(self: *const Stats, writer: anytype) !void {
-        const fmt = "{s: >25}: {d}\n";
-        try writer.print(fmt, .{ "pending", self.pending });
-        try writer.print(fmt, .{ "sent", self.sent });
-        try writer.print(fmt, .{ "rx_dropped", self.rx_dropped });
-        try writer.print(fmt, .{ "rx_invalid_descs", self.rx_invalid_descs });
-        try writer.print(fmt, .{ "tx_invalid_descs", self.tx_invalid_descs });
-        try writer.print(fmt, .{ "rx_ring_full", self.rx_ring_full });
-        try writer.print(fmt, .{ "rx_fill_ring_empty_descs", self.rx_fill_ring_empty_descs });
-        try writer.print(fmt, .{ "tx_ring_empty_descs", self.tx_ring_empty_descs });
-    }
-};
 
 pub fn updateXskStats(self: *Socket) !void {
     var stats: xdp.xdp_statistics = undefined;
