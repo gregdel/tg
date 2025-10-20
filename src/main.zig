@@ -22,7 +22,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const config = Config.init(allocator, "config.yaml") catch |err| return exitError(err);
+    var config = Config.init(allocator, "config.yaml") catch |err| return exitError(err);
     defer config.deinit();
     try stdout.print("{f}", .{config});
     try stdout.flush();
@@ -73,4 +73,5 @@ test {
     _ = @import("net/IpAddr.zig");
     _ = @import("layers/Ip.zig");
     _ = @import("range.zig");
+    _ = @import("CpuSet.zig");
 }

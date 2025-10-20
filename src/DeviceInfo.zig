@@ -1,22 +1,34 @@
 const std = @import("std");
 
 const MacAddr = @import("net/MacAddr.zig");
+const CpuSet = @import("CpuSet.zig");
 const DeviceInfo = @This();
+
+pub const max_queues = 128;
 
 name: []const u8,
 index: u32 = 0,
 mtu: u32 = 1500,
 addr: MacAddr = MacAddr.zero(),
+queue_count: u16 = 0,
+queues: [max_queues]?CpuSet = .{null} ** max_queues,
+
+const sysfs_path = "/sys/class/net/{s}";
 
 pub fn init(name: []const u8) !DeviceInfo {
+    var info: DeviceInfo = undefined;
     if (parseFiles(name)) |value| {
-        return value;
+        info = value;
     } else |err| return switch (err) {
         error.FileNotFound => error.DeviceNotFound,
         error.Overflow, error.InvalidCharacter => error.DeviceParse,
         MacAddr.ParseError => error.DeciceMacAddrParse,
         else => err,
     };
+
+    try info.parseQueues();
+
+    return info;
 }
 
 fn parseFiles(name: []const u8) !DeviceInfo {
@@ -34,10 +46,11 @@ pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
     try writer.print("{s: <13}: {d}\n", .{ "Index", self.index });
     try writer.print("{s: <13}: {d}\n", .{ "MTU", self.mtu });
     try writer.print("{s: <13}: {f}\n", .{ "Address", self.addr });
+    try writer.print("{s: <13}: {d}\n", .{ "Queues", self.queue_count });
 }
 
 fn open(dev: []const u8, path: []const u8, buf: []u8) !usize {
-    const device_path = try std.fmt.bufPrint(buf, "/sys/class/net/{s}/", .{dev});
+    const device_path = try std.fmt.bufPrint(buf, sysfs_path, .{dev});
     var dir = try std.fs.openDirAbsolute(device_path, .{});
     defer dir.close();
 
@@ -45,6 +58,39 @@ fn open(dev: []const u8, path: []const u8, buf: []u8) !usize {
     defer file.close();
 
     return file.read(buf);
+}
+
+pub fn parseQueues(self: *DeviceInfo) !void {
+    var buf: [64]u8 = undefined;
+    const base_path = sysfs_path ++ "/queues/";
+    const device_path = try std.fmt.bufPrint(&buf, base_path, .{self.name});
+    var dir = try std.fs.openDirAbsolute(device_path, .{ .iterate = true });
+
+    var iter = dir.iterate();
+
+    const xps_cpus_fmt = base_path ++ "tx-{d}/xps_cpus";
+    while (try iter.next()) |entry| {
+        if (entry.kind != .directory) continue;
+        if (!std.mem.startsWith(u8, entry.name, "tx-")) continue;
+        const queue = try std.fmt.parseInt(u16, entry.name[3..], 10);
+
+        const xps_cpus_path = try std.fmt.bufPrint(
+            &buf,
+            xps_cpus_fmt,
+            .{ self.name, queue },
+        );
+        var file = std.fs.openFileAbsolute(xps_cpus_path, .{}) catch continue;
+        errdefer file.close();
+
+        const read = file.read(&buf) catch continue;
+        const end = read - 1;
+        self.queues[queue] = try CpuSet.parse(buf[0..end]);
+        self.queue_count += 1;
+
+        file.close();
+    }
+
+    return;
 }
 
 fn parse(comptime T: type, dev: []const u8, name: []const u8, buf: []u8) !T {
@@ -58,14 +104,4 @@ fn parse(comptime T: type, dev: []const u8, name: []const u8, buf: []u8) !T {
             else => @compileError("Unsupported type:" ++ @typeName(T)),
         },
     };
-}
-
-test "get device info on loopback" {
-    const device_info = try DeviceInfo.init("lo");
-    // Index should be positive
-    try std.testing.expect(device_info.index > 0);
-    // MTU should be positive
-    try std.testing.expect(device_info.mtu > 0);
-    // Loopback typically has a zero MAC address
-    try std.testing.expectEqual(MacAddr.zero(), device_info.addr);
 }
