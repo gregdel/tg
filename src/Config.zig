@@ -97,7 +97,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
         .dev = dev,
         .device_info = device_info,
         .pkt_size = pkt_size,
-        .threads = 1,
+        .threads = try getValue(?u32, map.get("threads")) orelse device_info.queue_count,
         .count = try getValue(?u64, map.get("count")),
         .batch = try getValue(?u16, map.get("batch")) orelse default_batch,
         .layers = layers,
