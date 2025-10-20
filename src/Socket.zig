@@ -2,6 +2,7 @@ const std = @import("std");
 
 const pkt = @import("pkt.zig");
 const Config = @import("Config.zig");
+const CpuSet = @import("CpuSet.zig");
 
 const xsk = @cImport({
     @cInclude("xdp/xsk.h");
@@ -29,6 +30,13 @@ fd: std.posix.socket_t,
 stats: Stats,
 
 pub fn init(config: *const Config, queue_id: u32) !Socket {
+    // Bind the thread to the proper CPU
+    var cpu_set = config.device_info.queues[queue_id] orelse CpuSet.zero();
+    if (cpu_set.isEmpty()) {
+        cpu_set.setFallback(queue_id + 1);
+    }
+    try cpu_set.apply();
+
     const size: usize = page_size * config.entries;
 
     const addr = try std.posix.mmap(
