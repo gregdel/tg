@@ -4,18 +4,37 @@ const signal = @import("signal.zig");
 const Socket = @import("Socket.zig");
 const Config = @import("Config.zig");
 
+const max_queues = @import("DeviceInfo.zig").max_queues;
+
 pub const Tg = @This();
 
 config: *const Config,
 socket: Socket,
 
-pub fn init(config: *const Config) !Tg {
-    // TODO: do this in the thread
-    try setCpuAffinity(0);
+pub fn init(config: *Config) !Tg {
+    var queue: u32 = 0;
+    var i: u8 = 0;
+    var found: u8 = 0;
+    while (i < max_queues) : (i += 1) {
+        if (config.device_info.queues[i]) |*cpu_set| {
+            found += 1;
+            if (found == 1) {
+                // TODO: only 1 queue for now
+                queue = i;
+                if (cpu_set.isEmpty()) {
+                    // Queue n <=> CPU n
+                    cpu_set.setFallback(queue + 1);
+                } else {
+                    try cpu_set.apply();
+                }
+            }
+        }
+        if (found == config.device_info.queue_count) break;
+    }
 
     return .{
         .config = config,
-        .socket = try Socket.init(config, 0),
+        .socket = try Socket.init(config, queue),
     };
 }
 
@@ -44,11 +63,4 @@ pub fn run(self: *Tg) !void {
 
 pub fn format(self: *const Tg, writer: anytype) !void {
     try writer.print("{f}", .{self.socket.stats});
-}
-
-// TODO: do this the proper way
-pub fn setCpuAffinity(cpu: u6) !void {
-    var cpu_set = std.mem.zeroes(std.os.linux.cpu_set_t);
-    cpu_set[0] = @as(usize, 1) << cpu;
-    try std.os.linux.sched_setaffinity(0, &cpu_set);
 }
