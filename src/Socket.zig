@@ -1,9 +1,11 @@
 const std = @import("std");
 
+const signal = @import("signal.zig");
 const pkt = @import("pkt.zig");
 const Config = @import("Config.zig");
 const CpuSet = @import("CpuSet.zig");
 const Stats = @import("Stats.zig");
+const Layer = @import("layers/layer.zig").Layer;
 
 const xsk = @cImport({
     @cInclude("xdp/xsk.h");
@@ -23,12 +25,16 @@ const SocketError = error{
 
 pub const Socket = @This();
 
-config: *const Config,
+pkt_size: u16,
+entries: u32, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
+count: ?u64,
+batch: u32,
 umem_area: []align(page_size) u8,
 cq: xsk.xsk_ring_cons,
 tx: xsk.xsk_ring_prod,
 fd: std.posix.socket_t,
 stats: *Stats,
+layers: []const Layer,
 
 pub fn init(config: *const Config, queue_id: u32, stats: *Stats) !Socket {
     // Bind the thread to the proper CPU
@@ -107,22 +113,47 @@ pub fn init(config: *const Config, queue_id: u32, stats: *Stats) !Socket {
         .fd = socket_fd,
         .tx = tx,
         .umem_area = addr[0..size],
-        .config = config,
+        .entries = config.entries,
+        .pkt_size = config.pkt_size,
         .stats = stats,
+        .layers = config.layers.asSlice(),
+        .count = config.count,
+        .batch = config.batch,
     };
 }
 
+pub fn deinit(self: *Socket) void {
+    std.posix.munmap(self.umem_area);
+    return;
+}
+
 fn umemAddr(self: *Socket, id: usize) usize {
-    return (id % self.config.entries) * page_size;
+    return (id % self.entries) * page_size;
+}
+
+pub fn run(self: *Socket) !void {
+    try self.fillAll();
+    while (signal.running.load(.acquire)) {
+        if (self.count) |limit| {
+            const remaining = limit - self.stats.sent;
+            if (remaining == 0) break;
+            try self.send(@min(self.batch, remaining));
+        } else {
+            try self.send(self.batch);
+        }
+
+        try self.wakeup();
+        try self.checkCompleted();
+    }
+    try self.updateXskStats();
 }
 
 pub fn fillAll(self: *Socket) !void {
-    var id: u64 = 0;
-    while (id < self.config.entries) : (id += 1) {
+    for (0..self.entries) |id| {
         const start = self.umemAddr(id);
-        const end = start + self.config.pkt_size;
+        const end = start + self.pkt_size;
         _ = try pkt.build(
-            &self.config.layers,
+            self.layers,
             self.umem_area[start..end],
             id,
         );
@@ -186,7 +217,7 @@ pub fn send(self: *Socket, count: u32) !void {
         if (desc == null) return error.NullDesc;
         desc.* = .{
             .addr = self.umemAddr(id),
-            .len = @intCast(self.config.pkt_size),
+            .len = @intCast(self.pkt_size),
             .options = 0,
         };
         // std.log.debug("new desc id:{d} desc:{any}", .{ id, desc.* });
@@ -212,9 +243,4 @@ pub fn updateXskStats(self: *Socket) !void {
     self.stats.rx_ring_full = stats.rx_ring_full;
     self.stats.rx_fill_ring_empty_descs = stats.rx_fill_ring_empty_descs;
     self.stats.tx_ring_empty_descs = stats.tx_ring_empty_descs;
-}
-
-pub fn deinit(self: *Socket) void {
-    std.posix.munmap(self.umem_area);
-    return;
 }

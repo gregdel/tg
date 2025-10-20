@@ -9,23 +9,8 @@ pub const Layers = @This();
 entries: [max_layers]Layer = undefined,
 count: u8 = 0,
 
-const Iterator = struct {
-    i: usize = 0,
-    layers: []const Layer,
-
-    pub fn next(self: *Iterator) ?*const Layer {
-        if (self.i == self.layers.len) return null;
-        defer self.i += 1;
-        return &self.layers[self.i];
-    }
-
-    pub fn reset(self: *Iterator) void {
-        self.i = 0;
-    }
-};
-
-pub fn iterator(self: *const Layers) Iterator {
-    return .{ .layers = self.entries[0..self.count] };
+pub fn asSlice(self: *const Layers) []const Layer {
+    return self.entries[0..self.count];
 }
 
 pub fn fixSize(self: *Layers, total: u16) void {

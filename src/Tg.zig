@@ -25,22 +25,7 @@ pub fn threadRun(socket: *Socket, stats: *Stats, config: *const Config, queue_id
     defer socket.deinit();
 
     std.log.debug("socket init done for queue {d}", .{queue_id});
-
-    try socket.fillAll();
-    try signal.setup();
-    while (signal.running.load(.acquire)) {
-        if (socket.config.count) |limit| {
-            const remaining = limit - socket.stats.sent;
-            if (remaining == 0) break;
-            try socket.send(@min(socket.config.batch, remaining));
-        } else {
-            try socket.send(socket.config.batch);
-        }
-
-        try socket.wakeup();
-        try socket.checkCompleted();
-    }
-
+    try socket.run();
     try socket.updateXskStats();
 }
 
@@ -51,6 +36,7 @@ pub fn run(self: *Tg) !void {
     var threads: [max_queues]std.Thread = undefined;
     var queues: usize = 0;
 
+    try signal.setup();
     for (0..self.config.threads) |queue| {
         stats[queue] = .{};
         sockets[queue] = undefined;
