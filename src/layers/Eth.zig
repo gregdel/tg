@@ -24,19 +24,9 @@ pub fn size(_: *const Eth) u16 {
     return 14;
 }
 
-pub fn setLen(_: *Eth, _: u16) void {}
-
-pub fn cksum(_: *const Eth, _: []u8, _: u16) !u16 {
-    return 0;
-}
-
 pub fn setNextProto(self: *Eth, next_proto: u16) !void {
     if (self.proto != unset) return error.AlreadySet;
     self.proto = next_proto;
-}
-
-pub fn getProto(_: *const Eth) ?u16 {
-    return null;
 }
 
 pub fn format(self: *const Eth, writer: anytype) !void {

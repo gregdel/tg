@@ -2,12 +2,14 @@ const Eth = @import("Eth.zig");
 const Ip = @import("Ip.zig");
 const Udp = @import("Udp.zig");
 const Vlan = @import("Vlan.zig");
+const Vxlan = @import("Vxlan.zig");
 
 pub const Layer = union(enum) {
     eth: Eth,
     ip: Ip,
     udp: Udp,
     vlan: Vlan,
+    vxlan: Vxlan,
 
     pub fn name(self: Layer) []const u8 {
         return @tagName(self);
@@ -21,12 +23,14 @@ pub const Layer = union(enum) {
 
     pub fn cksum(self: *const Layer, data: []u8, seed: u16) !u16 {
         return switch (self.*) {
+            .eth, .vlan, .vxlan => 0,
             inline else => |layer| try layer.cksum(data, seed),
         };
     }
 
     pub fn setLen(self: *Layer, len: u16) void {
         return switch (self.*) {
+            .eth, .vlan, .vxlan => {},
             inline else => |*layer| layer.setLen(len),
         };
     }
@@ -34,12 +38,14 @@ pub const Layer = union(enum) {
     pub fn setNextProto(self: *Layer, next_proto: ?u16) !void {
         if (next_proto == null) return;
         return switch (self.*) {
+            .udp, .vxlan => {},
             inline else => |*layer| layer.setNextProto(next_proto.?),
         };
     }
 
     pub fn getProto(self: *const Layer) ?u16 {
         return switch (self.*) {
+            .eth, .vxlan => null,
             inline else => |layer| layer.getProto(),
         };
     }
