@@ -2,6 +2,7 @@ dev: tg0
 pkt_size: 1500
 batch: 64
 count: 10
+pre_fill: false
 layers:
   - type: eth
     src: de:ad:be:ef:00:00
