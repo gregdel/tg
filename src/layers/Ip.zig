@@ -4,6 +4,8 @@ const checksum = @import("../net/checksum.zig");
 const IpAddr = @import("../net/IpAddr.zig");
 const Range = @import("../range.zig").Range;
 
+const unset: u8 = std.os.linux.IPPROTO.RAW;
+
 pub const Ip = @This();
 
 version: u4 = 4,
@@ -36,6 +38,16 @@ pub fn cksum(self: *const Ip, data: []u8, _: u16) !u16 {
     const sum = try checksum.cksum(header, 0);
     std.mem.writeInt(u16, data[10..12], sum, .big);
     return self.pseudoHeaderCksum(header);
+}
+
+pub fn setNextProto(self: *Ip, next_proto: u16) !void {
+    if (self.protocol != unset) return error.AlreadySet;
+    if (next_proto >= std.os.linux.IPPROTO.MAX) return error.InvalidIpProto;
+    self.protocol = @truncate(next_proto);
+}
+
+pub fn getProto(_: *const Ip) ?u16 {
+    return std.os.linux.ETH.P.IP;
 }
 
 pub fn write(self: *const Ip, writer: anytype, seed: u64) !usize {
@@ -76,11 +88,12 @@ const ipProto = enum(u8) {
     icmpv6 = std.os.linux.IPPROTO.ICMPV6,
 };
 
-pub fn parseIpProto(input: []const u8) !u8 {
-    return if (std.meta.stringToEnum(ipProto, input)) |proto|
+pub fn parseIpProto(input: ?[]const u8) !u8 {
+    if (input == null) return unset;
+    return if (std.meta.stringToEnum(ipProto, input.?)) |proto|
         @intFromEnum(proto)
     else
-        std.fmt.parseInt(u8, input, 10);
+        std.fmt.parseInt(u8, input.?, 10);
 }
 
 test "pseudo header checksum" {
