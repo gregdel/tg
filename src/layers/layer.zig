@@ -29,6 +29,19 @@ pub const Layer = union(enum) {
         };
     }
 
+    pub fn setNextProto(self: *Layer, next_proto: ?u16) !void {
+        if (next_proto == null) return;
+        return switch (self.*) {
+            inline else => |*layer| layer.setNextProto(next_proto.?),
+        };
+    }
+
+    pub fn getProto(self: *const Layer) ?u16 {
+        return switch (self.*) {
+            inline else => |layer| layer.getProto(),
+        };
+    }
+
     pub fn format(self: *const Layer, writer: anytype) !void {
         return switch (self.*) {
             inline else => |layer| try layer.format(writer),

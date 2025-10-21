@@ -67,7 +67,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
                 .src = try Range(MacAddr).parse(try getValue([]const u8, layer.get("src"))),
                 .dst = try Range(MacAddr).parse(try getValue([]const u8, layer.get("dst"))),
                 .proto = try Eth.parseEthProto(
-                    try getValue([]const u8, layer.get("proto")),
+                    try getValue(?[]const u8, layer.get("proto")),
                 ),
             } });
         }
@@ -77,7 +77,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
                 .saddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("src"))),
                 .daddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("dst"))),
                 .protocol = try Ip.parseIpProto(
-                    try getValue([]const u8, layer.get("proto")),
+                    try getValue(?[]const u8, layer.get("proto")),
                 ),
             } });
         }
@@ -92,6 +92,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
 
     const pkt_size = try getValue(?u16, map.get("pkt_size")) orelse default_pkt_size;
     layers.fixSize(pkt_size);
+    try layers.fixMissingNextHeader();
 
     return .{
         .allocator = allocator,

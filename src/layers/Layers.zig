@@ -21,6 +21,20 @@ pub fn fixSize(self: *Layers, total: u16) void {
     }
 }
 
+pub fn fixMissingNextHeader(self: *Layers) !void {
+    for (0..self.count - 1) |i| {
+        const j = i + 1;
+        const next_proto = self.entries[j].getProto();
+        if (next_proto == null) continue;
+        self.entries[i].setNextProto(next_proto.?) catch |err| {
+            switch (err) {
+                error.AlreadySet => continue,
+                else => return err,
+            }
+        };
+    }
+}
+
 pub fn addLayer(self: *Layers, layer: Layer) !void {
     if (self.count >= max_layers) return error.TooManyLayers;
     self.entries[self.count] = layer;
