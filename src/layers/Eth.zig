@@ -40,9 +40,15 @@ pub fn getProto(_: *const Eth) ?u16 {
 }
 
 pub fn format(self: *const Eth, writer: anytype) !void {
-    try writer.print("src:{f} dst:{f} proto:{d}", .{
-        self.src, self.dst, self.proto,
-    });
+    if (std.meta.intToEnum(ethProto, self.proto)) |proto| {
+        try writer.print("src:{f} dst:{f} next_proto:{s}(0x{x:0>4})", .{
+            self.src, self.dst, @tagName(proto), self.proto,
+        });
+    } else |_| {
+        try writer.print("src:{f} dst:{f} next_proto:0x{x:0>4}", .{
+            self.src, self.dst, self.proto,
+        });
+    }
 }
 
 const ethProto = enum(u16) {

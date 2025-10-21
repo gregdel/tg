@@ -72,9 +72,15 @@ pub fn size(self: *const Ip) u16 {
 }
 
 pub fn format(self: *const Ip, writer: anytype) !void {
-    try writer.print("ip src:{f} dst:{f} tot_len:{d} proto:{d}", .{
-        self.saddr, self.daddr, self.tot_len, self.protocol,
-    });
+    if (std.meta.intToEnum(ipProto, self.protocol)) |proto| {
+        try writer.print("ip src:{f} dst:{f} tot_len:{d} next_proto:{s}({d})", .{
+            self.saddr, self.daddr, self.tot_len, @tagName(proto), self.protocol,
+        });
+    } else |_| {
+        try writer.print("ip src:{f} dst:{f} tot_len:{d} next_proto:{d}", .{
+            self.saddr, self.daddr, self.tot_len, self.protocol,
+        });
+    }
 }
 
 const ipProto = enum(u8) {
