@@ -20,6 +20,7 @@ threads: u32,
 pkt_size: u16,
 batch: u32,
 count: ?u64,
+pre_fill: bool,
 ring_size: u32 = 2048,
 entries: u32 = 2048 * 2, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
 device_info: DeviceInfo,
@@ -97,6 +98,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
         .dev = dev,
         .device_info = device_info,
         .pkt_size = pkt_size,
+        .pre_fill = try getValue(?bool, map.get("pre_fill")) orelse false,
         .threads = try getValue(?u32, map.get("threads")) orelse device_info.queue_count,
         .count = try getValue(?u64, map.get("count")),
         .batch = try getValue(?u16, map.get("batch")) orelse default_batch,
@@ -109,18 +111,29 @@ pub fn deinit(self: *const Config) void {
 }
 
 pub fn format(self: *const Config, writer: anytype) !void {
-    try writer.print("{s: <13}: \n", .{"Device info"});
+    const fmt = "{s: <13}";
+    const fmtTitle = fmt ++ ":\n";
+    const fmtNumber = fmt ++ ": {d}\n";
+    const fmtBool = fmt ++ ": {}\n";
+    try writer.print(fmtTitle, .{"Device info"});
     try writer.print("{f}", .{self.device_info});
-    try writer.print("{s: <13}: {d}\n", .{ "Threads", self.threads });
-    try writer.print("{s: <13}: {d}\n", .{ "Batch", self.batch });
-    try writer.print("{s: <13}: {d}\n", .{ "Ring size", self.ring_size });
-    try writer.print("{s: <13}: {d}\n", .{ "Packet size", self.pkt_size });
-    try writer.print("{s: <13}: {d}\n", .{ "Entries", self.entries });
+    try writer.print(fmtNumber, .{ "Threads", self.threads });
+    try writer.print(fmtNumber, .{ "Batch", self.batch });
+    try writer.print(fmtNumber, .{ "Ring size", self.ring_size });
+    try writer.print(fmtNumber, .{ "Packet size", self.pkt_size });
+    try writer.print(fmtNumber, .{ "Entries", self.entries });
     if (self.count != null) {
-        try writer.print("{s: <13}: {d}\n", .{ "Count", self.count.? });
+        try writer.print(fmtNumber, .{ "Count", self.count.? });
     }
-    try writer.print("{s: <13}: \n", .{"Layers"});
+    try writer.print(fmtBool, .{ "Pre-Fill", self.pre_fill });
+    try writer.print(fmtTitle, .{"Layers"});
     try writer.print("{f}", .{self.layers});
+}
+
+fn parseBool(str: []const u8) !bool {
+    if (std.mem.eql(u8, str, "true")) return true;
+    if (std.mem.eql(u8, str, "false")) return false;
+    return error.YamlInvalid;
 }
 
 fn getValue(comptime MaybeT: type, maybe_value: ?Yaml.Value) !MaybeT {
@@ -134,6 +147,7 @@ fn getValue(comptime MaybeT: type, maybe_value: ?Yaml.Value) !MaybeT {
 
     return switch (@typeInfo(T)) {
         .int => try std.fmt.parseInt(T, value, 10),
+        .bool => try parseBool(value),
         .pointer => |info| switch (info.size) {
             .slice => return value,
             else => @compileError("Unsupported pointer type " ++ @tagName(info.size)),

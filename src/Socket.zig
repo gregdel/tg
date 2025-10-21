@@ -29,6 +29,7 @@ pkt_size: u16,
 entries: u32, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
 count: ?u64,
 batch: u32,
+pre_fill: bool,
 umem_area: []align(page_size) u8,
 cq: xsk.xsk_ring_cons,
 tx: xsk.xsk_ring_prod,
@@ -119,6 +120,7 @@ pub fn init(config: *const Config, queue_id: u32, stats: *Stats) !Socket {
         .layers = config.layers.asSlice(),
         .count = config.count,
         .batch = config.batch,
+        .pre_fill = config.pre_fill,
     };
 }
 
@@ -132,7 +134,7 @@ fn umemAddr(self: *Socket, id: usize) usize {
 }
 
 pub fn run(self: *Socket) !void {
-    try self.fillAll();
+    if (self.pre_fill) try self.fillAll();
     while (signal.running.load(.acquire)) {
         if (self.count) |limit| {
             const remaining = limit - self.stats.sent;
@@ -149,7 +151,11 @@ pub fn run(self: *Socket) !void {
 }
 
 pub fn fillAll(self: *Socket) !void {
-    for (0..self.entries) |id| {
+    return self.fill(0, self.entries);
+}
+
+pub fn fill(self: *Socket, id_start: usize, count: usize) !void {
+    for (id_start..(id_start + count)) |id| {
         const start = self.umemAddr(id);
         const end = start + self.pkt_size;
         _ = try pkt.build(
@@ -210,6 +216,10 @@ pub fn send(self: *Socket, count: u32) !void {
         &id,
     );
     if (reserved != count) return; // TODO
+
+    if (!self.pre_fill) {
+        try self.fill(id, count);
+    }
 
     var i: u32 = 0;
     while (i < count) : (i += 1) {
