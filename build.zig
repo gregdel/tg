@@ -36,11 +36,34 @@ pub fn build(b: *std.Build) !void {
     root_module.linkLibrary(libbpf);
     root_module.linkLibrary(libxdp);
 
+    const xdp_programs = b.addObject(.{
+        .name = "tg_xdp",
+        .root_module = b.createModule(.{
+            .strip = false,
+            .root_source_file = b.path("src/kern/tg.zig"),
+            .optimize = .ReleaseFast,
+            .target = b.resolveTargetQuery(.{
+                .cpu_arch = switch (target.result.cpu.arch.endian()) {
+                    .big => .bpfeb,
+                    .little => .bpfel,
+                },
+                .os_tag = .freestanding,
+            }),
+        }),
+    });
+
+    const install_xdp = b.addInstallFileWithDir(
+        xdp_programs.getEmittedBin(),
+        .prefix,
+        "tg.xdp",
+    );
+
     // Binary
     const exe = b.addExecutable(.{
         .name = "tg",
         .root_module = root_module,
     });
+    exe.step.dependOn(&install_xdp.step);
     b.installArtifact(exe);
 
     // Tests
