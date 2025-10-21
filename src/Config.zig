@@ -72,6 +72,15 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
             } });
         }
 
+        if (std.mem.eql(u8, layer_type, "vlan")) {
+            try layers.addLayer(.{ .vlan = .{
+                .vlan = try Range(u12).parse(try getValue([]const u8, layer.get("vlan"))),
+                .proto = try Eth.parseEthProto(
+                    try getValue(?[]const u8, layer.get("proto")),
+                ),
+            } });
+        }
+
         if (std.mem.eql(u8, layer_type, "ip")) {
             try layers.addLayer(.{ .ip = .{
                 .saddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("src"))),

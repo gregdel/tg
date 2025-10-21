@@ -5,7 +5,7 @@ const Eth = @This();
 const MacAddr = @import("../net/MacAddr.zig");
 const Range = @import("../range.zig").Range;
 
-const unset: u16 = 0xffff;
+pub const unset: u16 = 0xffff;
 
 src: Range(MacAddr),
 dst: Range(MacAddr),
@@ -51,10 +51,11 @@ pub fn format(self: *const Eth, writer: anytype) !void {
     }
 }
 
-const ethProto = enum(u16) {
+pub const ethProto = enum(u16) {
     arp = std.os.linux.ETH.P.ARP,
     ip = std.os.linux.ETH.P.IP,
     ipv6 = std.os.linux.ETH.P.IPV6,
+    vlan = std.os.linux.ETH.P.P_8021Q,
 };
 
 pub fn parseEthProto(input: ?[]const u8) !u16 {

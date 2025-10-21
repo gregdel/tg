@@ -7,6 +7,8 @@ layers:
   - type: eth
     src: de:ad:be:ef:00:00
     dst: de:ad:be:ef:00:01
+  - type: vlan
+    vlan: 1-10
   - type: ip
     src: 192.168.1.1-192.168.1.255
     dst: 192.168.1.2
