@@ -5,12 +5,12 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .libxdp = .{
-            .url = "git+https://github.com/gregdel/libxdp.zig#84c543d784921273777c87d3c773e24b432f0c7c",
-            .hash = "libxdp-1.5.7-mHadTdEOAABbmC_ZkBDXx4GnVZxIfLmr7cnttkYwyUxz",
+            .url = "git+https://github.com/gregdel/libxdp.zig#6fe367b932be5b73f55e4b26612c6d9e1db2baab",
+            .hash = "libxdp-1.5.7-mHadTYgOAABg7wkbsXusfKmQyC4PyZCcNucA4OklPDjL",
         },
         .libbpf = .{
-            .url = "git+https://github.com/gregdel/libbpf.zig#84ee9b06777005937b5064be255263614ed96d6c",
-            .hash = "libbpf-1.6.2-VCqW0wUPAADVctuR0nMkxlMM2-IFYg-yiQWsQ6sGHW72",
+            .url = "git+https://github.com/gregdel/libbpf.zig#425eb006312ffe9482301f47504dbd8f3b3b3410",
+            .hash = "libbpf-1.6.2-VCqW05UQAAA6VTkauGoykYi0zLnsGu3BwA0opXdqYUBY",
         },
         .yaml = .{
             .url = "git+https://github.com/kubkon/zig-yaml#a6c2cd8760bf45c49b17a3f6259c4dfe3ded528e",
