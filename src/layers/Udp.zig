@@ -28,8 +28,6 @@ pub fn getProto(_: *const Udp) ?u16 {
     return std.os.linux.IPPROTO.UDP;
 }
 
-pub fn setNextProto(_: *const Udp, _: u16) !void {}
-
 pub inline fn write(self: *const Udp, writer: anytype, seed: u64) !usize {
     const source = self.source.get(seed);
     const dest = self.dest.get(seed);

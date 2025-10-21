@@ -14,4 +14,15 @@ layers:
     dst: 192.168.1.2
   - type: udp
     src: 1000-2000
-    dst: 5000
+    dst: 4789
+  - type: vxlan
+    vni: 10000-20000
+  - type: eth
+    src: ba:be:00:00:00:00
+    dst: ba:be:00:00:00:01
+  - type: ip
+    src: 10.0.0.0-10.0.255.255
+    dst: 10.42.0.0
+  - type: udp
+    src: 10000-20000
+    dst: 12345

@@ -21,12 +21,6 @@ pub inline fn write(self: *const Vlan, writer: anytype, seed: u64) !usize {
     return self.size();
 }
 
-pub fn setLen(_: *Vlan, _: u16) void {}
-
-pub fn cksum(_: *const Vlan, _: []u8, _: u16) !u16 {
-    return 0;
-}
-
 pub fn setNextProto(self: *Vlan, next_proto: u16) !void {
     if (self.proto != unset) return error.AlreadySet;
     self.proto = next_proto;

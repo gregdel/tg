@@ -81,6 +81,12 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
             } });
         }
 
+        if (std.mem.eql(u8, layer_type, "vxlan")) {
+            try layers.addLayer(.{ .vxlan = .{
+                .vni = try Range(u24).parse(try getValue([]const u8, layer.get("vni"))),
+            } });
+        }
+
         if (std.mem.eql(u8, layer_type, "ip")) {
             try layers.addLayer(.{ .ip = .{
                 .saddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("src"))),
