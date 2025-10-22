@@ -73,4 +73,5 @@ test {
     _ = @import("layers/Ip.zig");
     _ = @import("range.zig");
     _ = @import("CpuSet.zig");
+    _ = @import("pretty.zig");
 }
