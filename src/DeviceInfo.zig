@@ -10,7 +10,7 @@ pub const max_queues = 128;
 name: []const u8,
 index: u32 = 0,
 mtu: u16 = 1500,
-speed: u64 = 0,
+speed: ?u64 = 0,
 addr: MacAddr = MacAddr.zero(),
 queue_count: u16 = 0,
 queues: [max_queues]?CpuSet = .{null} ** max_queues,
@@ -35,12 +35,16 @@ pub fn init(name: []const u8) !DeviceInfo {
 
 fn parseFiles(name: []const u8) !DeviceInfo {
     var buf: [64]u8 = undefined;
+
+    var speed: ?u64 = parse(u64, name, "speed", &buf) catch null;
+    if (speed) |*s| s.* *= 1_000_000;
+
     return .{
         .name = name,
         .index = try parse(u32, name, "ifindex", &buf),
         .addr = try parse(MacAddr, name, "address", &buf),
         .mtu = try parse(u16, name, "mtu", &buf),
-        .speed = try parse(u64, name, "speed", &buf) * 1_000_000,
+        .speed = speed,
     };
 }
 
@@ -53,11 +57,13 @@ pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
     try writer.print(fmt_separator, .{});
     try writer.print(fmt ++ "{s} (index:{d})\n", .{ "Name", self.name, self.index });
     try writer.print(fmt ++ "{d}\n", .{ "MTU", self.mtu });
-    if (pretty.printNumber(&buf, self.speed, "bit/s")) |speed| {
-        try writer.print(fmt ++ "{s}\n", .{ "Speed", speed });
-    } else |_| {}
     try writer.print(fmt ++ "{f}\n", .{ "Address", self.addr });
     try writer.print(fmt ++ "{d}\n", .{ "Queues", self.queue_count });
+    const speed_str: []const u8 = if (self.speed) |speed|
+        pretty.printNumber(&buf, speed, "bit/s") catch "Unknown"
+    else
+        "Unknown";
+    try writer.print(fmt ++ "{s}\n", .{ "Speed", speed_str });
     try writer.print(fmt_separator, .{});
 }
 
