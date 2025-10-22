@@ -26,10 +26,11 @@ const SocketError = error{
 pub const Socket = @This();
 
 pkt_size: u16,
-entries: u32, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
-count: ?u64,
+entries: u32,
+frame_limit: ?u64,
 batch: u32,
 pre_fill: bool,
+frames_per_packet: u8,
 umem_area: []align(page_size) u8,
 cq: xsk.xsk_ring_cons,
 tx: xsk.xsk_ring_prod,
@@ -86,13 +87,18 @@ pub fn init(config: *const Config, queue_id: u32, stats: *Stats) !Socket {
     );
     if (ret < 0) return SocketError.UmemCreate;
 
+    var bind_flags: u16 = xsk.XDP_USE_NEED_WAKEUP;
+    if (config.frames_per_packet > 1) {
+        bind_flags |= xsk.XDP_USE_SG;
+    }
+
     const socket_config: xsk.xsk_socket_config = .{
         .rx_size = 0,
         .tx_size = config.ring_size,
         .unnamed_0 = .{
             .libbpf_flags = xsk.XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
         },
-        .bind_flags = xsk.XDP_USE_NEED_WAKEUP,
+        .bind_flags = bind_flags,
     };
 
     ret = xsk.xsk_socket__create(
@@ -118,9 +124,10 @@ pub fn init(config: *const Config, queue_id: u32, stats: *Stats) !Socket {
         .pkt_size = config.pkt_size,
         .stats = stats,
         .layers = config.layers.asSlice(),
-        .count = config.count,
+        .frame_limit = config.frame_limit,
         .batch = config.batch,
         .pre_fill = config.pre_fill,
+        .frames_per_packet = config.frames_per_packet,
     };
 }
 
@@ -134,35 +141,38 @@ fn umemAddr(self: *Socket, id: usize) usize {
 }
 
 pub fn run(self: *Socket) !void {
+    var seed: u64 = 0;
     if (self.pre_fill) try self.fillAll();
     while (signal.running.load(.acquire)) {
-        if (self.count) |limit| {
+        var to_send: u32 = self.batch;
+        if (self.frame_limit) |limit| {
             const remaining = limit - self.stats.sent;
             if (remaining == 0) break;
-            try self.send(@min(self.batch, remaining));
-        } else {
-            try self.send(self.batch);
+            to_send = @min(self.batch, remaining);
         }
 
+        try self.send(to_send, seed);
         try self.wakeup();
         try self.checkCompleted();
+        seed +%= to_send;
     }
     try self.updateXskStats();
 }
 
 pub fn fillAll(self: *Socket) !void {
-    return self.fill(0, self.entries);
+    return self.fill(0, self.entries, 0);
 }
 
-pub fn fill(self: *Socket, id_start: usize, count: usize) !void {
-    for (id_start..(id_start + count)) |id| {
-        const start = self.umemAddr(id);
-        const end = start + self.pkt_size;
-        try pkt.build(
-            self.layers,
-            self.umem_area[start..end],
-            id,
-        );
+pub fn fill(self: *Socket, id_start: usize, frame_count: usize, seed_start: u64) !void {
+    var seed = seed_start;
+    var id = id_start;
+    // Only fill the first packet of a multi packet frame.
+    while (id < id_start + frame_count) : (id += self.frames_per_packet) {
+        const buf_start = self.umemAddr(id);
+        const buf_end = buf_start + page_size;
+        const buf = self.umem_area[buf_start..buf_end];
+        try pkt.build(self.layers, buf, seed);
+        seed += 1;
     }
 }
 
@@ -204,38 +214,46 @@ pub inline fn checkCompleted(self: *Socket) !void {
     self.stats.sent += count;
 }
 
-pub fn send(self: *Socket, count: u32) !void {
+pub fn send(self: *Socket, frames: u32, seed_start: u64) !void {
     var id: u32 = 0;
 
-    const free = xsk.xsk_prod_nb_free(@ptrCast(&self.tx), count);
-    if (free < count) return; // TODO
+    if (frames % self.frames_per_packet != 0) unreachable;
+
+    const free = xsk.xsk_prod_nb_free(@ptrCast(&self.tx), frames);
+    if (free < frames) return; // TODO
 
     const reserved = xsk.xsk_ring_prod__reserve(
         @ptrCast(&self.tx),
-        count,
+        frames,
         &id,
     );
-    if (reserved != count) return; // TODO
+    if (reserved != frames) return; // TODO
 
     if (!self.pre_fill) {
-        try self.fill(id, count);
+        try self.fill(id, frames, seed_start);
     }
 
     var i: u32 = 0;
-    while (i < count) : (i += 1) {
+    var len: u32 = undefined;
+    while (i < frames) : (i += 1) {
+        const new_packet = i % self.frames_per_packet == 0;
+        if (new_packet) len = self.pkt_size;
+        const has_more = len > page_size;
+        const desc_len: u32 = if (has_more) page_size else len;
+
         const desc = xsk.xsk_ring_prod__tx_desc(@ptrCast(&self.tx), id);
         if (desc == null) return error.NullDesc;
         desc.* = .{
             .addr = self.umemAddr(id),
-            .len = @intCast(self.pkt_size),
-            .options = 0,
+            .len = @intCast(desc_len),
+            .options = if (has_more) xsk.XDP_PKT_CONTD else 0,
         };
-        // std.log.debug("new desc id:{d} desc:{any}", .{ id, desc.* });
+        len -= desc_len;
         id +%= 1;
     }
 
-    xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), count);
-    self.stats.pending += count;
+    xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), frames);
+    self.stats.pending += frames;
 }
 
 pub fn updateXskStats(self: *Socket) !void {

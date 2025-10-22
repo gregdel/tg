@@ -19,8 +19,9 @@ dev: []const u8,
 threads: u32,
 pkt_size: u16,
 batch: u32,
-count: ?u64,
+frame_limit: ?u64,
 pre_fill: bool,
+frames_per_packet: u8,
 ring_size: u32 = 2048,
 entries: u32 = 2048 * 2, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
 device_info: DeviceInfo,
@@ -108,15 +109,31 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
     layers.fixSize(pkt_size);
     try layers.fixMissingNextHeader();
 
+    const frames_per_packet: u8 = @truncate(pkt_size / std.heap.pageSize() + 1);
+    var batch = try getValue(?u16, map.get("batch")) orelse default_batch;
+    // Adjust the batch size to be a multiple of frames_per_packet
+    batch -= batch % frames_per_packet;
+
+    var frame_limit = try getValue(?u64, map.get("count"));
+    if (frame_limit) |*limit| {
+        limit.* *= frames_per_packet;
+    }
+
+    // Adjust the umem entries to be a multiple of frames_per_packet
+    var entries: u32 = 2048 * 2;
+    entries -= entries % frames_per_packet;
+
     return .{
         .allocator = allocator,
         .dev = dev,
         .device_info = device_info,
         .pkt_size = pkt_size,
+        .entries = entries,
+        .frames_per_packet = frames_per_packet,
         .pre_fill = try getValue(?bool, map.get("pre_fill")) orelse false,
         .threads = try getValue(?u32, map.get("threads")) orelse device_info.queue_count,
-        .count = try getValue(?u64, map.get("count")),
-        .batch = try getValue(?u16, map.get("batch")) orelse default_batch,
+        .frame_limit = frame_limit,
+        .batch = batch,
         .layers = layers,
     };
 }
@@ -126,19 +143,21 @@ pub fn deinit(self: *const Config) void {
 }
 
 pub fn format(self: *const Config, writer: anytype) !void {
-    const fmt = "{s: <13}";
+    const fmt = "{s: <18}";
     const fmtTitle = fmt ++ ":\n";
     const fmtNumber = fmt ++ ": {d}\n";
     const fmtBool = fmt ++ ": {}\n";
-    try writer.print(fmtTitle, .{"Device info"});
     try writer.print("{f}", .{self.device_info});
     try writer.print(fmtNumber, .{ "Threads", self.threads });
     try writer.print(fmtNumber, .{ "Batch", self.batch });
     try writer.print(fmtNumber, .{ "Ring size", self.ring_size });
     try writer.print(fmtNumber, .{ "Packet size", self.pkt_size });
+    if (self.frames_per_packet > 1) {
+        try writer.print(fmtNumber, .{ "Frames per packet", self.frames_per_packet });
+    }
     try writer.print(fmtNumber, .{ "Entries", self.entries });
-    if (self.count != null) {
-        try writer.print(fmtNumber, .{ "Count", self.count.? });
+    if (self.frame_limit != null) {
+        try writer.print(fmtNumber, .{ "Frames", self.frame_limit.? });
     }
     try writer.print(fmtBool, .{ "Pre-Fill", self.pre_fill });
     try writer.print(fmtTitle, .{"Layers"});
@@ -210,7 +229,7 @@ test "parse yaml" {
     try std.testing.expectEqualStrings("tg0", config.dev);
     try std.testing.expectEqual(1500, config.pkt_size);
     try std.testing.expectEqual(256, config.batch);
-    try std.testing.expectEqual(1024, config.count);
+    try std.testing.expectEqual(1024, config.frame_limit);
     try std.testing.expectEqual(3, config.layers.count);
 }
 
