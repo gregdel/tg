@@ -27,7 +27,6 @@ device_info: DeviceInfo,
 
 const Config = @This();
 
-const default_pkt_size = 64;
 const default_batch = 64;
 const max_file_size = 100_000; // ~100ko
 
@@ -105,7 +104,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
         }
     }
 
-    const pkt_size = try getValue(?u16, map.get("pkt_size")) orelse default_pkt_size;
+    const pkt_size = try getValue(?u16, map.get("pkt_size")) orelse device_info.mtu;
     layers.fixSize(pkt_size);
     try layers.fixMissingNextHeader();
 
@@ -226,6 +225,6 @@ test "parse yaml optional" {
     ;
     var config = try initRaw(std.testing.allocator, source, false);
     defer config.deinit();
-    try std.testing.expectEqual(default_pkt_size, config.pkt_size);
+    try std.testing.expectEqual(config.device_info.mtu, config.pkt_size);
     try std.testing.expectEqual(default_batch, config.batch);
 }
