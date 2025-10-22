@@ -21,10 +21,17 @@ pub const Layer = union(enum) {
         };
     }
 
-    pub fn cksum(self: *const Layer, data: []u8, seed: u16) !u16 {
+    pub fn pseudoHeaderCksum(self: *const Layer, data: []const u8) !u16 {
         return switch (self.*) {
-            .eth, .vlan, .vxlan => 0,
-            inline else => |layer| try layer.cksum(data, seed),
+            .ip => |layer| layer.pseudoHeaderCksum(data),
+            inline else => 0,
+        };
+    }
+
+    pub fn updateCksum(self: *const Layer, data: []u8, pseudo_header_cksum: u16) !void {
+        return switch (self.*) {
+            .eth, .vlan, .vxlan => {},
+            inline else => |layer| try layer.updateCksum(data, pseudo_header_cksum),
         };
     }
 

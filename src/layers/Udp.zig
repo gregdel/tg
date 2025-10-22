@@ -18,10 +18,9 @@ pub fn setLen(self: *Udp, len: u16) void {
     self.len = len;
 }
 
-pub fn cksum(_: *const Udp, data: []u8, seed: u16) !u16 {
+pub fn updateCksum(_: *const Udp, data: []u8, seed: u16) !void {
     const sum = try checksum.cksum(data, ~seed);
     std.mem.writeInt(u16, data[6..8], sum, .big);
-    return 0;
 }
 
 pub fn getProto(_: *const Udp) ?u16 {
