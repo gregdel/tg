@@ -9,7 +9,7 @@ pub const max_queues = 128;
 
 name: []const u8,
 index: u32 = 0,
-mtu: u32 = 1500,
+mtu: u16 = 1500,
 speed: u64 = 0,
 addr: MacAddr = MacAddr.zero(),
 queue_count: u16 = 0,
@@ -39,7 +39,7 @@ fn parseFiles(name: []const u8) !DeviceInfo {
         .name = name,
         .index = try parse(u32, name, "ifindex", &buf),
         .addr = try parse(MacAddr, name, "address", &buf),
-        .mtu = try parse(u32, name, "mtu", &buf),
+        .mtu = try parse(u16, name, "mtu", &buf),
         .speed = try parse(u64, name, "speed", &buf) * 1_000_000,
     };
 }
