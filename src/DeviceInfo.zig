@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const pretty = @import("pretty.zig");
 const MacAddr = @import("net/MacAddr.zig");
 const CpuSet = @import("CpuSet.zig");
 const DeviceInfo = @This();
@@ -9,7 +10,7 @@ pub const max_queues = 128;
 name: []const u8,
 index: u32 = 0,
 mtu: u32 = 1500,
-speed: u32 = 0,
+speed: u64 = 0,
 addr: MacAddr = MacAddr.zero(),
 queue_count: u16 = 0,
 queues: [max_queues]?CpuSet = .{null} ** max_queues,
@@ -39,16 +40,19 @@ fn parseFiles(name: []const u8) !DeviceInfo {
         .index = try parse(u32, name, "ifindex", &buf),
         .addr = try parse(MacAddr, name, "address", &buf),
         .mtu = try parse(u32, name, "mtu", &buf),
-        .speed = try parse(u32, name, "speed", &buf),
+        .speed = try parse(u64, name, "speed", &buf) * 1_000_000,
     };
 }
 
 pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
+    var buf: [64]u8 = undefined;
     const fmt = "{s: <13}: ";
     try writer.print(fmt ++ "{s}\n", .{ "Name", self.name });
     try writer.print(fmt ++ "{d}\n", .{ "Index", self.index });
     try writer.print(fmt ++ "{d}\n", .{ "MTU", self.mtu });
-    try writer.print(fmt ++ "{d}\n", .{ "Speed", self.speed });
+    if (pretty.printNumber(&buf, self.speed, "bit/s")) |speed| {
+        try writer.print(fmt ++ "{s}\n", .{ "Speed", speed });
+    } else |_| {}
     try writer.print(fmt ++ "{f}\n", .{ "Address", self.addr });
     try writer.print(fmt ++ "{d}\n", .{ "Queues", self.queue_count });
 }
@@ -102,7 +106,7 @@ fn parse(comptime T: type, dev: []const u8, name: []const u8, buf: []u8) !T {
     if (read < 2) return error.DeviceParse;
     const end = read - 1;
     return switch (@typeInfo(T)) {
-        .int => std.fmt.parseInt(u32, buf[0..end], 10),
+        .int => std.fmt.parseInt(T, buf[0..end], 10),
         else => switch (T) {
             MacAddr => MacAddr.parse(buf[0..end]),
             else => @compileError("Unsupported type:" ++ @typeName(T)),
