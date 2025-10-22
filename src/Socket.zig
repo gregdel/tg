@@ -158,7 +158,7 @@ pub fn fill(self: *Socket, id_start: usize, count: usize) !void {
     for (id_start..(id_start + count)) |id| {
         const start = self.umemAddr(id);
         const end = start + self.pkt_size;
-        _ = try pkt.build(
+        try pkt.build(
             self.layers,
             self.umem_area[start..end],
             id,

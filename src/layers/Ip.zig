@@ -24,7 +24,8 @@ pub fn setLen(self: *Ip, len: u16) void {
     self.tot_len = len;
 }
 
-pub fn pseudoHeaderCksum(self: *const Ip, header: []const u8) !u16 {
+pub fn pseudoHeaderCksum(self: *const Ip, data: []const u8) !u16 {
+    const header = data[0..self.size()];
     var pseudo_header: [12]u8 = undefined;
     @memcpy(pseudo_header[0..4], header[12..16]);
     @memcpy(pseudo_header[4..8], header[16..20]);
@@ -33,11 +34,10 @@ pub fn pseudoHeaderCksum(self: *const Ip, header: []const u8) !u16 {
     return checksum.cksum(&pseudo_header, 0);
 }
 
-pub fn cksum(self: *const Ip, data: []u8, _: u16) !u16 {
+pub fn updateCksum(self: *const Ip, data: []u8, _: u16) !void {
     const header = data[0..self.size()];
     const sum = try checksum.cksum(header, 0);
     std.mem.writeInt(u16, data[10..12], sum, .big);
-    return self.pseudoHeaderCksum(header);
 }
 
 pub fn setNextProto(self: *Ip, next_proto: u16) !void {
@@ -113,6 +113,6 @@ test "pseudo header checksum" {
     var writer = std.Io.Writer.fixed(&buffer);
     const written = try hdr.write(&writer, 0);
     try writer.flush();
-    try std.testing.expectEqual(try hdr.pseudoHeaderCksum(&buffer), 0x76FC);
+    try std.testing.expectEqual(0x76FC, try hdr.pseudoHeaderCksum(&buffer));
     try std.testing.expectEqual(hdr.size(), written);
 }
