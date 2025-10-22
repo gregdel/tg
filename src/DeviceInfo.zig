@@ -46,15 +46,19 @@ fn parseFiles(name: []const u8) !DeviceInfo {
 
 pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
     var buf: [64]u8 = undefined;
-    const fmt = "{s: <13}: ";
-    try writer.print(fmt ++ "{s}\n", .{ "Name", self.name });
-    try writer.print(fmt ++ "{d}\n", .{ "Index", self.index });
+    const fmt = "{s: <8}: ";
+    const fmt_separator = "-----------\n";
+
+    try writer.print("Device info\n", .{});
+    try writer.print(fmt_separator, .{});
+    try writer.print(fmt ++ "{s} (index:{d})\n", .{ "Name", self.name, self.index });
     try writer.print(fmt ++ "{d}\n", .{ "MTU", self.mtu });
     if (pretty.printNumber(&buf, self.speed, "bit/s")) |speed| {
         try writer.print(fmt ++ "{s}\n", .{ "Speed", speed });
     } else |_| {}
     try writer.print(fmt ++ "{f}\n", .{ "Address", self.addr });
     try writer.print(fmt ++ "{d}\n", .{ "Queues", self.queue_count });
+    try writer.print(fmt_separator, .{});
 }
 
 fn open(dev: []const u8, path: []const u8, buf: []u8) !usize {

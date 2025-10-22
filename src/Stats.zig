@@ -27,7 +27,7 @@ pub fn add(self: *Stats, other: *const Stats) void {
 pub fn format(self: *const Stats, writer: anytype) !void {
     const fmt = "{s: >25}: {d}\n";
     try writer.print(fmt, .{ "pending", self.pending });
-    try writer.print(fmt, .{ "sent", self.sent });
+    try writer.print(fmt, .{ "frames_sent", self.sent });
     try writer.print(fmt, .{ "rx_dropped", self.rx_dropped });
     try writer.print(fmt, .{ "rx_invalid_descs", self.rx_invalid_descs });
     try writer.print(fmt, .{ "tx_invalid_descs", self.tx_invalid_descs });
