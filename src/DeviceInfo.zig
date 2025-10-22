@@ -9,6 +9,7 @@ pub const max_queues = 128;
 name: []const u8,
 index: u32 = 0,
 mtu: u32 = 1500,
+speed: u32 = 0,
 addr: MacAddr = MacAddr.zero(),
 queue_count: u16 = 0,
 queues: [max_queues]?CpuSet = .{null} ** max_queues,
@@ -38,15 +39,18 @@ fn parseFiles(name: []const u8) !DeviceInfo {
         .index = try parse(u32, name, "ifindex", &buf),
         .addr = try parse(MacAddr, name, "address", &buf),
         .mtu = try parse(u32, name, "mtu", &buf),
+        .speed = try parse(u32, name, "speed", &buf),
     };
 }
 
 pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
-    try writer.print("{s: <13}: {s}\n", .{ "Name", self.name });
-    try writer.print("{s: <13}: {d}\n", .{ "Index", self.index });
-    try writer.print("{s: <13}: {d}\n", .{ "MTU", self.mtu });
-    try writer.print("{s: <13}: {f}\n", .{ "Address", self.addr });
-    try writer.print("{s: <13}: {d}\n", .{ "Queues", self.queue_count });
+    const fmt = "{s: <13}: ";
+    try writer.print(fmt ++ "{s}\n", .{ "Name", self.name });
+    try writer.print(fmt ++ "{d}\n", .{ "Index", self.index });
+    try writer.print(fmt ++ "{d}\n", .{ "MTU", self.mtu });
+    try writer.print(fmt ++ "{d}\n", .{ "Speed", self.speed });
+    try writer.print(fmt ++ "{f}\n", .{ "Address", self.addr });
+    try writer.print(fmt ++ "{d}\n", .{ "Queues", self.queue_count });
 }
 
 fn open(dev: []const u8, path: []const u8, buf: []u8) !usize {
