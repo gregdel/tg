@@ -5,12 +5,12 @@ const cksum = @import("net/checksum.zig");
 const MacAddr = @import("net/MacAddr.zig");
 const IpAddr = @import("net/IpAddr.zig");
 
-const Layer = @import("layers/layer.zig").Layer;
+const Layers = @import("layers/Layers.zig");
 
-pub fn build(layers: []const Layer, buf: []u8, seed: u64) !void {
+pub fn build(layers: Layers, buf: []u8, seed: u64) !void {
     var writer = std.Io.Writer.fixed(buf);
     var pos: usize = 0;
-    for (layers) |layer| {
+    for (layers.asSlice()) |layer| {
         pos += try layer.write(&writer, seed);
     }
     try writer.flush();
@@ -19,14 +19,14 @@ pub fn build(layers: []const Layer, buf: []u8, seed: u64) !void {
     // so we don't need to do the checksum on it.
     const end_of_packet = pos + 1;
 
-    var i = layers.len;
+    var i = layers.count;
     while (i > 0) {
         i -= 1;
-        var current = layers[i];
+        var current = layers.entries[i];
         pos -= current.size();
 
         const pseudo_header: u16 = if (i > 0) blk: {
-            const prev = layers[i - 1];
+            const prev = layers.entries[i - 1];
             const start = pos - prev.size();
             break :blk try prev.pseudoHeaderCksum(buf[start..end_of_packet]);
         } else 0;

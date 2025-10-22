@@ -6,6 +6,7 @@ const IpAddr = @import("net/IpAddr.zig");
 const MacAddr = @import("net/MacAddr.zig");
 const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
+const SocketConfig = @import("Socket.zig").SocketConfig;
 
 const Ip = @import("layers/Ip.zig");
 const Eth = @import("layers/Eth.zig");
@@ -13,18 +14,10 @@ const Layers = @import("layers/Layers.zig");
 const Layer = @import("layers/layer.zig").Layer;
 
 allocator: std.mem.Allocator,
-
 layers: Layers,
-dev: []const u8,
-threads: u32,
-pkt_size: u16,
-batch: u32,
-frame_limit: ?u64,
-pre_fill: bool,
-frames_per_packet: u8,
-ring_size: u32 = 2048,
-entries: u32 = 2048 * 2, // XSK_RING_PROD__DEFAULT_NUM_DESCS;
+socket_config: SocketConfig,
 device_info: DeviceInfo,
+threads: u32,
 
 const Config = @This();
 
@@ -125,41 +118,33 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
 
     return .{
         .allocator = allocator,
-        .dev = dev,
-        .device_info = device_info,
-        .pkt_size = pkt_size,
-        .entries = entries,
-        .frames_per_packet = frames_per_packet,
-        .pre_fill = try getValue(?bool, map.get("pre_fill")) orelse false,
         .threads = try getValue(?u32, map.get("threads")) orelse device_info.queue_count,
-        .frame_limit = frame_limit,
-        .batch = batch,
+        .device_info = device_info,
         .layers = layers,
+        .socket_config = .{
+            .dev = dev,
+            .pkt_size = pkt_size,
+            .entries = entries,
+            .frames_per_packet = frames_per_packet,
+            .pre_fill = try getValue(?bool, map.get("pre_fill")) orelse false,
+            .frame_limit = frame_limit,
+            .batch = batch,
+            .layers = layers,
+        },
     };
 }
 
 pub fn deinit(self: *const Config) void {
-    self.allocator.free(self.dev);
+    self.allocator.free(self.socket_config.dev);
 }
 
 pub fn format(self: *const Config, writer: anytype) !void {
     const fmt = "{s: <18}";
     const fmtTitle = fmt ++ ":\n";
     const fmtNumber = fmt ++ ": {d}\n";
-    const fmtBool = fmt ++ ": {}\n";
     try writer.print("{f}", .{self.device_info});
+    try writer.print("{f}", .{self.socket_config});
     try writer.print(fmtNumber, .{ "Threads", self.threads });
-    try writer.print(fmtNumber, .{ "Batch", self.batch });
-    try writer.print(fmtNumber, .{ "Ring size", self.ring_size });
-    try writer.print(fmtNumber, .{ "Packet size", self.pkt_size });
-    if (self.frames_per_packet > 1) {
-        try writer.print(fmtNumber, .{ "Frames per packet", self.frames_per_packet });
-    }
-    try writer.print(fmtNumber, .{ "Entries", self.entries });
-    if (self.frame_limit != null) {
-        try writer.print(fmtNumber, .{ "Frames", self.frame_limit.? });
-    }
-    try writer.print(fmtBool, .{ "Pre-Fill", self.pre_fill });
     try writer.print(fmtTitle, .{"Layers"});
     try writer.print("{f}", .{self.layers});
 }
@@ -226,10 +211,10 @@ test "parse yaml" {
     var config = try initRaw(std.testing.allocator, source, false);
     defer config.deinit();
 
-    try std.testing.expectEqualStrings("tg0", config.dev);
-    try std.testing.expectEqual(1500, config.pkt_size);
-    try std.testing.expectEqual(256, config.batch);
-    try std.testing.expectEqual(1024, config.frame_limit);
+    try std.testing.expectEqualStrings("tg0", config.socket_config.dev);
+    try std.testing.expectEqual(1500, config.socket_config.pkt_size);
+    try std.testing.expectEqual(256, config.socket_config.batch);
+    try std.testing.expectEqual(1024, config.socket_config.frame_limit);
     try std.testing.expectEqual(3, config.layers.count);
 }
 
@@ -244,6 +229,6 @@ test "parse yaml optional" {
     ;
     var config = try initRaw(std.testing.allocator, source, false);
     defer config.deinit();
-    try std.testing.expectEqual(config.device_info.mtu, config.pkt_size);
-    try std.testing.expectEqual(default_batch, config.batch);
+    try std.testing.expectEqual(config.device_info.mtu, config.socket_config.pkt_size);
+    try std.testing.expectEqual(default_batch, config.socket_config.batch);
 }
