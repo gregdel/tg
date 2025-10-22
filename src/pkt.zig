@@ -15,20 +15,22 @@ pub fn build(layers: []const Layer, buf: []u8, seed: u64) !void {
     }
     try writer.flush();
 
+    // For now don't write anything at the end of the packet, it's all zeroes
+    // so we don't need to do the checksum on it.
+    const end_of_packet = pos + 1;
+
     var i = layers.len;
     while (i > 0) {
         i -= 1;
-
         var current = layers[i];
         pos -= current.size();
 
         const pseudo_header: u16 = if (i > 0) blk: {
             const prev = layers[i - 1];
             const start = pos - prev.size();
-            if (start >= buf.len or pos >= buf.len) unreachable;
-            break :blk try prev.pseudoHeaderCksum(buf[start..]);
+            break :blk try prev.pseudoHeaderCksum(buf[start..end_of_packet]);
         } else 0;
 
-        try current.updateCksum(buf[pos..], pseudo_header);
+        try current.updateCksum(buf[pos..end_of_packet], pseudo_header);
     }
 }
