@@ -24,20 +24,9 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    const root_module = b.createModule(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-        .imports = &.{
-            .{ .name = "yaml", .module = yaml.module("yaml") },
-        },
-    });
-    root_module.linkLibrary(libbpf);
-    root_module.linkLibrary(libxdp);
-
+    const xdp_file = "tg_xdp";
     const xdp_programs = b.addObject(.{
-        .name = "tg_xdp",
+        .name = xdp_file,
         .root_module = b.createModule(.{
             .strip = false,
             .root_source_file = b.path("src/kern/tg.zig"),
@@ -54,9 +43,24 @@ pub fn build(b: *std.Build) !void {
 
     const install_xdp = b.addInstallFileWithDir(
         xdp_programs.getEmittedBin(),
-        .prefix,
-        "tg.xdp",
+        .lib,
+        xdp_file,
     );
+
+    const root_module = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .imports = &.{
+            .{ .name = "yaml", .module = yaml.module("yaml") },
+        },
+    });
+    root_module.linkLibrary(libbpf);
+    root_module.linkLibrary(libxdp);
+    root_module.addAnonymousImport(xdp_file, .{
+        .root_source_file = b.path("zig-out/lib/" ++ xdp_file),
+    });
 
     // Binary
     const exe = b.addExecutable(.{
