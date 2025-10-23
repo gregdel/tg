@@ -9,6 +9,18 @@ const CpuSet = @import("CpuSet.zig");
 
 const max_queues = @import("DeviceInfo.zig").max_queues;
 
+const ThreadContext = struct {
+    stats: Stats,
+    config: SocketConfig,
+
+    pub fn init(default_config: SocketConfig) ThreadContext {
+        return .{
+            .stats = .{},
+            .config = default_config,
+        };
+    }
+};
+
 pub const Tg = @This();
 
 config: *const Config,
@@ -20,11 +32,11 @@ pub fn init(config: *const Config) !Tg {
     };
 }
 
-pub fn threadRun(config: *const SocketConfig, stats: *Stats) !void {
-    if (config.queue_id >= max_queues) return error.TooManyQueues;
-    var socket = try Socket.init(config, stats);
+pub fn threadRun(ctx: *ThreadContext) !void {
+    if (ctx.config.queue_id >= max_queues) return error.TooManyQueues;
+    var socket = try Socket.init(&ctx.config, &ctx.stats);
     defer socket.deinit();
-    std.log.debug("Thread started for queue {d}", .{config.queue_id});
+    std.log.debug("Thread started for queue {d}", .{ctx.config.queue_id});
     try socket.run();
     try socket.updateXskStats();
 }
@@ -32,29 +44,25 @@ pub fn threadRun(config: *const SocketConfig, stats: *Stats) !void {
 pub fn run(self: *Tg) !void {
     // TODO: cache align ?
     var threads: [max_queues]std.Thread = undefined;
-    var socket_stats: [max_queues]Stats = undefined;
-    var sockets_config: [max_queues]SocketConfig = undefined;
+    var threads_ctx: [max_queues]ThreadContext = undefined;
 
     try signal.setup();
     var queues: usize = 0;
     const default_config = self.config.socket_config;
     for (0..self.config.device_info.queue_count) |queue_id| {
-        socket_stats[queue_id] = .{};
-        sockets_config[queue_id] = default_config;
+        threads_ctx[queue_id] = ThreadContext.init(default_config);
 
-        var config = &sockets_config[queue_id];
-        const stats = &socket_stats[queue_id];
+        var ctx = &threads_ctx[queue_id];
+        ctx.config.queue_id = @truncate(queue_id);
+        ctx.config.affinity = self.config.device_info.queues[queue_id] orelse CpuSet.zero();
 
-        config.queue_id = @truncate(queue_id);
-        config.affinity = self.config.device_info.queues[queue_id] orelse CpuSet.zero();
-
-        threads[queue_id] = try std.Thread.spawn(.{}, Tg.threadRun, .{ config, stats });
+        threads[queue_id] = try std.Thread.spawn(.{}, Tg.threadRun, .{ctx});
         queues += 1;
     }
 
     for (0..queues) |queue| {
         threads[queue].join();
-        self.stats.add(&socket_stats[queue]);
+        self.stats.add(&threads_ctx[queue].stats);
     }
 }
 
