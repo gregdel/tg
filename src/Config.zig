@@ -98,7 +98,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
         }
     }
 
-    const pkt_size = try getValue(?u16, map.get("pkt_size")) orelse device_info.mtu;
+    const pkt_size = try getValue(?u16, map.get("pkt_size")) orelse layers.minSize();
     layers.fixSize(pkt_size);
     try layers.fixMissingNextHeader();
 
