@@ -23,6 +23,7 @@ const Config = @This();
 
 const default_batch = 64;
 const max_file_size = 100_000; // ~100ko
+const default_entries = @import("Socket.zig").ring_size;
 
 pub fn init(allocator: std.mem.Allocator, filename: []const u8) !Config {
     const file_content = try std.fs.cwd().readFileAlloc(allocator, filename, max_file_size);
@@ -113,7 +114,7 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
     }
 
     // Adjust the umem entries to be a multiple of frames_per_packet
-    var entries: u32 = 2048 * 2;
+    var entries: u32 = default_entries;
     entries -= entries % frames_per_packet;
 
     // The number of threads might be limited by the number of queues
