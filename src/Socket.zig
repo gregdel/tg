@@ -17,6 +17,8 @@ const xdp = @cImport({
 
 const page_size = std.heap.pageSize();
 
+pub const ring_size: u32 = xsk.XSK_RING_PROD__DEFAULT_NUM_DESCS;
+
 const SocketError = error{
     UmemCreate,
     SocketCreate,
@@ -32,8 +34,7 @@ pub const SocketConfig = struct {
     frames_per_packet: u8,
     frame_limit: ?u64,
     batch: u32,
-    ring_size: u32 = 2048,
-    entries: u32 = 2048 * 2, // XSK_RING_PROD__DEFAULT_NUM_DESCS;,
+    entries: u32,
     pre_fill: bool,
 
     pub fn format(self: *const SocketConfig, writer: anytype) !void {
@@ -41,7 +42,7 @@ pub const SocketConfig = struct {
         const fmtNumber = fmt ++ ": {d}\n";
         const fmtBool = fmt ++ ": {}\n";
         try writer.print(fmtNumber, .{ "Batch", self.batch });
-        try writer.print(fmtNumber, .{ "Ring size", self.ring_size });
+        try writer.print(fmtNumber, .{ "Ring size", ring_size });
         try writer.print(fmtNumber, .{ "Packet size", self.pkt_size });
         if (self.frames_per_packet > 1) {
             try writer.print(fmtNumber, .{
@@ -94,7 +95,7 @@ pub fn init(config: *const SocketConfig, stats: *Stats) !Socket {
 
     const umem_config: xsk.xsk_umem_config = .{
         .fill_size = 0,
-        .comp_size = config.ring_size,
+        .comp_size = ring_size,
         .frame_size = page_size,
         .frame_headroom = 0,
     };
@@ -123,7 +124,7 @@ pub fn init(config: *const SocketConfig, stats: *Stats) !Socket {
 
     const socket_config: xsk.xsk_socket_config = .{
         .rx_size = 0,
-        .tx_size = config.ring_size,
+        .tx_size = ring_size,
         .unnamed_0 = .{
             .libbpf_flags = xsk.XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD,
         },
@@ -241,9 +242,6 @@ pub fn send(self: *Socket, frames: u32, seed_start: u64) !void {
     var id: u32 = 0;
 
     if (frames % self.config.frames_per_packet != 0) unreachable;
-
-    const free = xsk.xsk_prod_nb_free(@ptrCast(&self.tx), frames);
-    if (free < frames) return; // TODO
 
     const reserved = xsk.xsk_ring_prod__reserve(
         @ptrCast(&self.tx),
