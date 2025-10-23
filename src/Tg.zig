@@ -48,6 +48,7 @@ pub fn run(self: *Tg) !void {
 
     try signal.setup();
     var queues: usize = 0;
+    var buf: [16]u8 = undefined;
     const default_config = self.config.socket_config;
     for (0..self.config.threads) |queue_id| {
         threads_ctx[queue_id] = ThreadContext.init(default_config);
@@ -57,6 +58,9 @@ pub fn run(self: *Tg) !void {
         ctx.config.affinity = self.config.device_info.queues[queue_id] orelse CpuSet.zero();
 
         threads[queue_id] = try std.Thread.spawn(.{}, Tg.threadRun, .{ctx});
+        const name = try std.fmt.bufPrint(&buf, "tg_q_{d}", .{queue_id});
+        try threads[queue_id].setName(name);
+
         queues += 1;
     }
 
