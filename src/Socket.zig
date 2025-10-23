@@ -287,10 +287,6 @@ pub fn updateXskStats(self: *Socket) !void {
         std.mem.asBytes(&stats),
     );
 
-    self.stats.rx_dropped = stats.rx_dropped;
-    self.stats.rx_invalid_descs = stats.rx_invalid_descs;
     self.stats.tx_invalid_descs = stats.tx_invalid_descs;
-    self.stats.rx_ring_full = stats.rx_ring_full;
-    self.stats.rx_fill_ring_empty_descs = stats.rx_fill_ring_empty_descs;
     self.stats.tx_ring_empty_descs = stats.tx_ring_empty_descs;
 }
