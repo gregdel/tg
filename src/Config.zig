@@ -116,9 +116,13 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
     var entries: u32 = 2048 * 2;
     entries -= entries % frames_per_packet;
 
+    // The number of threads might be limited by the number of queues
+    var threads = try getValue(?u32, map.get("threads")) orelse device_info.queue_count;
+    threads = @min(threads, device_info.queue_count);
+
     return .{
         .allocator = allocator,
-        .threads = try getValue(?u32, map.get("threads")) orelse device_info.queue_count,
+        .threads = threads,
         .device_info = device_info,
         .layers = layers,
         .socket_config = .{
