@@ -7,6 +7,7 @@ const MacAddr = @import("net/MacAddr.zig");
 const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
 const SocketConfig = @import("Socket.zig").SocketConfig;
+const CliArgs = @import("CliArgs.zig");
 
 const Ip = @import("layers/Ip.zig");
 const Eth = @import("layers/Eth.zig");
@@ -25,13 +26,14 @@ const default_batch = 64;
 const max_file_size = 100_000; // ~100ko
 const default_entries = @import("Socket.zig").ring_size;
 
-pub fn init(allocator: std.mem.Allocator, filename: []const u8) !Config {
-    const file_content = try std.fs.cwd().readFileAlloc(allocator, filename, max_file_size);
+pub fn init(allocator: std.mem.Allocator, cli_args: *const CliArgs) !Config {
+    if (cli_args.config == null) return error.MissingConfigFile;
+    const file_content = try std.fs.cwd().readFileAlloc(allocator, cli_args.config.?, max_file_size);
     defer allocator.free(file_content);
-    return initRaw(allocator, file_content, true);
+    return initRaw(allocator, cli_args, file_content, true);
 }
 
-fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Config {
+fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []const u8, probe: bool) !Config {
     var yaml: Yaml = .{ .source = source };
     defer yaml.deinit(allocator);
     try yaml.load(allocator);
@@ -39,8 +41,12 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
     if (yaml.docs.items.len != 1) return error.InvalidYaml;
     const map = yaml.docs.items[0].map;
 
-    const yaml_dev = getValue([]const u8, map.get("dev")) catch return error.ConfigMissingDev;
-    const dev = try allocator.dupe(u8, yaml_dev);
+    const tmp_dev = if (cli_args.dev) |dev|
+        dev
+    else
+        getValue([]const u8, map.get("dev")) catch return error.ConfigMissingDev;
+
+    const dev = try allocator.dupe(u8, tmp_dev);
     errdefer allocator.free(dev);
 
     const device_info = if (probe) try DeviceInfo.init(dev) else DeviceInfo{
@@ -208,7 +214,8 @@ test "parse yaml" {
         \\    src: 1234
         \\    dst: 5678
     ;
-    var config = try initRaw(std.testing.allocator, source, false);
+    const cli_args = CliArgs{ .cmd = .send };
+    var config = try initRaw(std.testing.allocator, &cli_args, source, false);
     defer config.deinit();
 
     try std.testing.expectEqualStrings("tg0", config.socket_config.dev);
@@ -227,8 +234,9 @@ test "parse yaml optional" {
         \\    dst: de:ad:be:ef:00:01
         \\    proto: ip
     ;
-    var config = try initRaw(std.testing.allocator, source, false);
+    const cli_args = CliArgs{ .cmd = .send };
+    var config = try initRaw(std.testing.allocator, &cli_args, source, false);
     defer config.deinit();
-    try std.testing.expectEqual(config.device_info.mtu, config.socket_config.pkt_size);
+    try std.testing.expectEqual(config.layers.minSize(), config.socket_config.pkt_size);
     try std.testing.expectEqual(default_batch, config.socket_config.pkt_batch);
 }

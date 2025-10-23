@@ -2,6 +2,7 @@ const std = @import("std");
 
 const Tg = @import("Tg.zig");
 const Config = @import("Config.zig");
+const CliArgs = @import("CliArgs.zig");
 
 pub const max_layers = @import("layers/Layers.zig").max_layers;
 
@@ -22,15 +23,21 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const config = Config.init(allocator, "config.yaml") catch |err| return exitError(err);
-    defer config.deinit();
-    try stdout.print("{f}", .{config});
-    try stdout.flush();
+    const cli_args = CliArgs.parse() catch |err| return exitError(err);
+    switch (cli_args.cmd) {
+        .send => {
+            const config = Config.init(allocator, &cli_args) catch |err| return exitError(err);
+            defer config.deinit();
+            try stdout.print("{f}", .{config});
+            try stdout.flush();
 
-    var tg = try Tg.init(&config);
-    try tg.run();
+            var tg = try Tg.init(&config);
+            try tg.run();
 
-    try stdout.print("\n{f}", .{tg});
+            try stdout.print("\n{f}", .{tg});
+        },
+    }
+
     try stdout.flush();
 }
 
@@ -49,8 +56,10 @@ fn exitError(err: anyerror) !void {
             "To many layers, max: {d}",
             .{max_layers},
         ),
+        error.MissingConfigFile => "Missing config file",
         error.ConfigMissingDev => "Missing dev in config",
         error.ConfigMissingLayers => "Missing layers in config",
+        error.CliUsage => @import("CliArgs.zig").usage,
         else => {
             try stderr.print("Failed to parse config: {t}\n", .{err});
             break :sw null;
