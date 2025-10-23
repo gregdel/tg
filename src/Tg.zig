@@ -49,7 +49,7 @@ pub fn run(self: *Tg) !void {
     try signal.setup();
     var queues: usize = 0;
     const default_config = self.config.socket_config;
-    for (0..self.config.device_info.queue_count) |queue_id| {
+    for (0..self.config.threads) |queue_id| {
         threads_ctx[queue_id] = ThreadContext.init(default_config);
 
         var ctx = &threads_ctx[queue_id];
