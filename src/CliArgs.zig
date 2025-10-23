@@ -4,24 +4,28 @@ const CliArgs = @This();
 
 dev: ?[]const u8 = null,
 config: ?[]const u8 = null,
+prog: ?[]const u8 = null,
 cmd: Cmd,
 
 const ArgType = enum {
     dev,
     config,
+    prog,
 };
 
 pub const usage =
     \\Usage:
     \\  tg [command] [args]
     \\Commands:
-    \\  send - send packets
-    \\    Args:
-    \\      dev [DEV]     - device to use
-    \\      config [PATH] - config file path
+    \\  send [dev DEV] [config PATH]
+    \\  attach dev DEV prog [tg_drop|tg_pass]
+    \\Arguments:
+    \\  DEV    device to use
+    \\  PATH   config file path
 ;
 const Cmd = enum {
     send,
+    attach,
 
     pub fn args(self: Cmd) std.StaticStringMap(ArgType) {
         return switch (self) {
@@ -29,11 +33,16 @@ const Cmd = enum {
                 .{ "dev", .dev },
                 .{ "config", .config },
             }),
+            .attach => std.StaticStringMap(ArgType).initComptime(.{
+                .{ "dev", .dev },
+                .{ "prog", .prog },
+            }),
         };
     }
 };
 const cmd_map = std.StaticStringMap(Cmd).initComptime(.{
     .{ "send", .send },
+    .{ "attach", .attach },
 });
 
 pub fn parse() !CliArgs {
@@ -65,6 +74,9 @@ pub fn parse() !CliArgs {
             },
             .config => {
                 cli.config = args.next() orelse return error.CliUsage;
+            },
+            .prog => {
+                cli.prog = args.next() orelse return error.CliUsage;
             },
         }
     }

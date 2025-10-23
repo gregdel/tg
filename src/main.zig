@@ -36,6 +36,9 @@ pub fn main() !void {
 
             try stdout.print("\n{f}", .{tg});
         },
+        .attach => {
+            Tg.attach(&cli_args) catch |err| return exitError(err);
+        },
     }
 
     try stdout.flush();
@@ -59,6 +62,7 @@ fn exitError(err: anyerror) !void {
         error.MissingConfigFile => "Missing config file",
         error.ConfigMissingDev => "Missing dev in config",
         error.ConfigMissingLayers => "Missing layers in config",
+        error.InvalidXdpProgram => "Invalid xdp program name",
         error.CliUsage => @import("CliArgs.zig").usage,
         else => {
             try stderr.print("Failed to parse config: {t}\n", .{err});

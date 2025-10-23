@@ -6,6 +6,8 @@ const SocketConfig = @import("Socket.zig").SocketConfig;
 const Config = @import("Config.zig");
 const Stats = @import("Stats.zig");
 const CpuSet = @import("CpuSet.zig");
+const CliArgs = @import("CliArgs.zig");
+const bpf = @import("bpf.zig");
 
 const max_queues = @import("DeviceInfo.zig").max_queues;
 
@@ -68,6 +70,12 @@ pub fn run(self: *Tg) !void {
         threads[queue].join();
         self.stats.add(&threads_ctx[queue].stats);
     }
+}
+
+pub fn attach(cli_args: *const CliArgs) !void {
+    const dev = cli_args.dev orelse return error.CliUsage;
+    const prog = cli_args.prog orelse return error.CliUsage;
+    try bpf.attach(dev, prog);
 }
 
 pub fn format(self: *const Tg, writer: anytype) !void {
