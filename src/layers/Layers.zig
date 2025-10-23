@@ -13,6 +13,14 @@ pub fn asSlice(self: *const Layers) []const Layer {
     return self.entries[0..self.count];
 }
 
+pub fn minSize(self: *Layers) u16 {
+    var size: u16 = 0;
+    for (self.entries[0..self.count]) |layer| {
+        size += layer.size();
+    }
+    return size;
+}
+
 pub fn fixSize(self: *Layers, total: u16) void {
     var remaining = total;
     for (self.entries[0..self.count]) |*layer| {
