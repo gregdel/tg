@@ -108,11 +108,6 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
     // Adjust the batch size to be a multiple of frames_per_packet
     batch -= batch % frames_per_packet;
 
-    var frame_limit = try getValue(?u64, map.get("count"));
-    if (frame_limit) |*limit| {
-        limit.* *= frames_per_packet;
-    }
-
     // Adjust the umem entries to be a multiple of frames_per_packet
     var entries: u32 = default_entries;
     entries -= entries % frames_per_packet;
@@ -132,8 +127,8 @@ fn initRaw(allocator: std.mem.Allocator, source: []const u8, probe: bool) !Confi
             .entries = entries,
             .frames_per_packet = frames_per_packet,
             .pre_fill = try getValue(?bool, map.get("pre_fill")) orelse false,
-            .frame_limit = frame_limit,
-            .batch = batch,
+            .pkt_count = try getValue(?u64, map.get("count")),
+            .pkt_batch = batch,
             .layers = layers,
         },
     };
@@ -218,8 +213,8 @@ test "parse yaml" {
 
     try std.testing.expectEqualStrings("tg0", config.socket_config.dev);
     try std.testing.expectEqual(1500, config.socket_config.pkt_size);
-    try std.testing.expectEqual(256, config.socket_config.batch);
-    try std.testing.expectEqual(1024, config.socket_config.frame_limit);
+    try std.testing.expectEqual(256, config.socket_config.pkt_batch);
+    try std.testing.expectEqual(1024, config.socket_config.pkt_count);
     try std.testing.expectEqual(3, config.layers.count);
 }
 
@@ -235,5 +230,5 @@ test "parse yaml optional" {
     var config = try initRaw(std.testing.allocator, source, false);
     defer config.deinit();
     try std.testing.expectEqual(config.device_info.mtu, config.socket_config.pkt_size);
-    try std.testing.expectEqual(default_batch, config.socket_config.batch);
+    try std.testing.expectEqual(default_batch, config.socket_config.pkt_batch);
 }

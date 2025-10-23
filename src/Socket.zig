@@ -32,8 +32,8 @@ pub const SocketConfig = struct {
     affinity: ?CpuSet = null,
     pkt_size: u16,
     frames_per_packet: u8,
-    frame_limit: ?u64,
-    batch: u32,
+    pkt_count: ?u64,
+    pkt_batch: u32,
     entries: u32,
     pre_fill: bool,
 
@@ -41,8 +41,8 @@ pub const SocketConfig = struct {
         const fmt = "{s: <18}";
         const fmtNumber = fmt ++ ": {d}\n";
         const fmtBool = fmt ++ ": {}\n";
-        try writer.print(fmtNumber, .{ "Batch", self.batch });
         try writer.print(fmtNumber, .{ "Ring size", ring_size });
+        try writer.print(fmtNumber, .{ "Packet batch", self.pkt_batch });
         try writer.print(fmtNumber, .{ "Packet size", self.pkt_size });
         if (self.frames_per_packet > 1) {
             try writer.print(fmtNumber, .{
@@ -51,8 +51,8 @@ pub const SocketConfig = struct {
             });
         }
         try writer.print(fmtNumber, .{ "Entries", self.entries });
-        if (self.frame_limit != null) {
-            try writer.print(fmtNumber, .{ "Frames", self.frame_limit.? });
+        if (self.pkt_count != null) {
+            try writer.print(fmtNumber, .{ "Packet count", self.pkt_count.? });
         }
         try writer.print(fmtBool, .{ "Pre-Fill", self.pre_fill });
     }
@@ -168,11 +168,12 @@ pub fn run(self: *Socket) !void {
     var seed: u64 = 0;
     if (self.config.pre_fill) try self.fillAll();
     while (signal.running.load(.acquire)) {
-        var to_send: u32 = self.config.batch;
-        if (self.config.frame_limit) |limit| {
-            const remaining = limit - self.stats.sent;
+        var to_send: u32 = self.config.pkt_batch;
+        if (self.config.pkt_count) |limit| {
+            const pkt_sent = self.stats.frames_sent / self.config.frames_per_packet;
+            const remaining = limit - pkt_sent;
             if (remaining == 0) break;
-            to_send = @min(self.config.batch, remaining);
+            to_send = @min(self.config.pkt_batch, remaining);
         }
 
         try self.send(to_send, seed);
@@ -187,11 +188,14 @@ pub fn fillAll(self: *Socket) !void {
     return self.fill(0, self.config.entries, 0);
 }
 
-pub fn fill(self: *Socket, id_start: usize, frame_count: usize, seed_start: u64) !void {
+pub fn fill(self: *Socket, id_start: usize, pkt_count: usize, seed_start: u64) !void {
     var seed = seed_start;
+    const total_frames = pkt_count * self.config.frames_per_packet;
     var id = id_start;
+    const id_end = id_start + total_frames;
+
     // Only fill the first packet of a multi packet frame.
-    while (id < id_start + frame_count) : (id += self.config.frames_per_packet) {
+    while (id < id_end) : (id += self.config.frames_per_packet) {
         const buf_start = self.umemAddr(id);
         const buf_end = buf_start + page_size;
         const buf = self.umem_area[buf_start..buf_end];
@@ -219,29 +223,25 @@ pub inline fn wakeup(self: *Socket) !void {
 }
 
 pub inline fn checkCompleted(self: *Socket) !void {
-    if (self.stats.pending == 0) return;
+    if (self.stats.frames_pending == 0) return;
 
     var id: u32 = undefined;
-    const count = xsk.xsk_ring_cons__peek(
+    const frames = xsk.xsk_ring_cons__peek(
         @ptrCast(&self.cq),
-        self.stats.pending,
+        self.stats.frames_pending,
         &id,
     );
-    if (count == 0) return;
+    if (frames == 0) return;
 
-    // std.log.debug("completed count:{any} pending:{d}", .{
-    //     count, self.pending,
-    // });
-
-    xsk.xsk_ring_cons__release(@ptrCast(&self.cq), count);
-    self.stats.pending -= count;
-    self.stats.sent += count;
+    xsk.xsk_ring_cons__release(@ptrCast(&self.cq), frames);
+    self.stats.frames_pending -= frames;
+    self.stats.frames_sent += frames;
 }
 
-pub fn send(self: *Socket, frames: u32, seed_start: u64) !void {
+pub fn send(self: *Socket, pkt_count: u32, seed_start: u64) !void {
     var id: u32 = 0;
 
-    if (frames % self.config.frames_per_packet != 0) unreachable;
+    const frames = pkt_count * self.config.frames_per_packet;
 
     const reserved = xsk.xsk_ring_prod__reserve(
         @ptrCast(&self.tx),
@@ -251,30 +251,31 @@ pub fn send(self: *Socket, frames: u32, seed_start: u64) !void {
     if (reserved != frames) return; // TODO
 
     if (!self.config.pre_fill) {
-        try self.fill(id, frames, seed_start);
+        try self.fill(id, pkt_count, seed_start);
     }
 
-    var i: u32 = 0;
-    var len: u32 = undefined;
-    while (i < frames) : (i += 1) {
-        const new_packet = i % self.config.frames_per_packet == 0;
-        if (new_packet) len = self.config.pkt_size;
-        const has_more = len > page_size;
-        const desc_len: u32 = if (has_more) page_size else len;
+    const last_frame_id = self.config.frames_per_packet - 1;
+    var i: usize = 0;
+    while (i < frames) : (i += self.config.frames_per_packet) {
+        var len: u32 = self.config.pkt_size;
+        for (0..self.config.frames_per_packet) |frame_id| {
+            const has_more = (frame_id != last_frame_id);
+            const desc_len: u32 = if (has_more) page_size else len;
 
-        const desc = xsk.xsk_ring_prod__tx_desc(@ptrCast(&self.tx), id);
-        if (desc == null) return error.NullDesc;
-        desc.* = .{
-            .addr = self.umemAddr(id),
-            .len = @intCast(desc_len),
-            .options = if (has_more) xsk.XDP_PKT_CONTD else 0,
-        };
-        len -= desc_len;
-        id +%= 1;
+            const desc = xsk.xsk_ring_prod__tx_desc(@ptrCast(&self.tx), id);
+            if (desc == null) return error.NullDesc;
+            desc.* = .{
+                .addr = self.umemAddr(id),
+                .len = @intCast(desc_len),
+                .options = if (has_more) xsk.XDP_PKT_CONTD else 0,
+            };
+            len -= desc_len;
+            id +%= 1;
+        }
     }
 
     xsk.xsk_ring_prod__submit(@ptrCast(&self.tx), frames);
-    self.stats.pending += frames;
+    self.stats.frames_pending += frames;
 }
 
 pub fn updateXskStats(self: *Socket) !void {
