@@ -8,6 +8,7 @@ prog: ?[]const u8 = null,
 cmd: Cmd,
 
 const ArgType = enum {
+    help,
     dev,
     config,
     prog,
@@ -32,10 +33,12 @@ const Cmd = enum {
             .send => std.StaticStringMap(ArgType).initComptime(.{
                 .{ "dev", .dev },
                 .{ "config", .config },
+                .{ "help", .help },
             }),
             .attach => std.StaticStringMap(ArgType).initComptime(.{
                 .{ "dev", .dev },
                 .{ "prog", .prog },
+                .{ "help", .help },
             }),
         };
     }
@@ -77,6 +80,9 @@ pub fn parse() !CliArgs {
             },
             .prog => {
                 cli.prog = args.next() orelse return error.CliUsage;
+            },
+            .help => {
+                return error.CliUsage;
             },
         }
     }
