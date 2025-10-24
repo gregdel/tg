@@ -28,6 +28,9 @@ pub fn attach(dev: []const u8, prog: []const u8) !void {
 
     const device_info = try DeviceInfo.init(dev);
 
+    // Disable libbpf logging
+    _ = bpf.libbpf_set_print(null);
+
     const obj = bpf.bpf_object__open_mem(@ptrCast(tg_xdp.ptr), tg_xdp.len, null) orelse {
         return error.BpfObjectOpen;
     };
