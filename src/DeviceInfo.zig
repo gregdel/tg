@@ -3,6 +3,7 @@ const std = @import("std");
 const pretty = @import("pretty.zig");
 const MacAddr = @import("net/MacAddr.zig");
 const CpuSet = @import("CpuSet.zig");
+const Capabilities = @import("bpf.zig").Capabilities;
 const DeviceInfo = @This();
 
 pub const max_queues = 128;
@@ -14,6 +15,7 @@ speed: ?u64 = 0,
 addr: MacAddr = MacAddr.zero(),
 queue_count: u16 = 0,
 queues: [max_queues]?CpuSet = .{null} ** max_queues,
+capabilities: Capabilities,
 
 const sysfs_path = "/sys/class/net/{s}";
 
@@ -29,6 +31,7 @@ pub fn init(name: []const u8) !DeviceInfo {
     };
 
     try info.parseQueues();
+    info.capabilities = try Capabilities.init(info.index);
 
     return info;
 }
@@ -45,26 +48,43 @@ fn parseFiles(name: []const u8) !DeviceInfo {
         .addr = try parse(MacAddr, name, "address", &buf),
         .mtu = try parse(u16, name, "mtu", &buf),
         .speed = speed,
+        .capabilities = .{},
     };
 }
 
 pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
-    var buf: [64]u8 = undefined;
-    const fmt = "{s: <8}: ";
-    const fmt_separator = "-----------\n";
-
-    try writer.print("Device info\n", .{});
-    try writer.print(fmt_separator, .{});
-    try writer.print(fmt ++ "{s} (index:{d})\n", .{ "Name", self.name, self.index });
-    try writer.print(fmt ++ "{d}\n", .{ "MTU", self.mtu });
-    try writer.print(fmt ++ "{f}\n", .{ "Address", self.addr });
-    try writer.print(fmt ++ "{d}\n", .{ "Queues", self.queue_count });
+    var speed_buf: [64]u8 = undefined;
     const speed_str: []const u8 = if (self.speed) |speed|
-        pretty.printNumber(&buf, speed, "bit/s") catch "Unknown"
+        pretty.printNumber(&speed_buf, speed, "bit/s") catch "Unknown"
     else
         "Unknown";
-    try writer.print(fmt ++ "{s}\n", .{ "Speed", speed_str });
-    try writer.print(fmt_separator, .{});
+
+    try writer.print(
+        \\Device info
+        \\-----------
+        \\Name    : {s} (index:{d})
+        \\MTU     : {d}
+        \\Address : {f}
+        \\Queues  : {d}
+        \\Speed   : {s}
+        \\Capabilities:
+        \\  Zerocopy     : {}
+        \\  Multi buffer : {} (max_frames:{d})
+        \\-----------
+        \\
+    ,
+        .{
+            self.name,
+            self.index,
+            self.mtu,
+            self.addr,
+            self.queue_count,
+            speed_str,
+            self.capabilities.zerocopy,
+            self.capabilities.multi_buffer,
+            self.capabilities.multi_buffer_max_frames,
+        },
+    );
 }
 
 fn open(dev: []const u8, path: []const u8, buf: []u8) !usize {

@@ -8,6 +8,7 @@ const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
 const SocketConfig = @import("Socket.zig").SocketConfig;
 const CliArgs = @import("CliArgs.zig");
+const bpf = @import("bpf.zig");
 
 const Ip = @import("layers/Ip.zig");
 const Eth = @import("layers/Eth.zig");
@@ -51,6 +52,7 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
 
     const device_info = if (probe) try DeviceInfo.init(dev) else DeviceInfo{
         .name = dev,
+        .capabilities = .{},
     };
 
     const layers_raw = map.get("layers") orelse return error.ConfigMissingLayers;
