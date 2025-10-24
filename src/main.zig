@@ -39,6 +39,9 @@ pub fn main() !void {
         .attach => {
             Tg.attach(&cli_args) catch |err| return exitError(err);
         },
+        .detach => {
+            Tg.detach(&cli_args) catch |err| return exitError(err);
+        },
     }
 
     try stdout.flush();
@@ -65,7 +68,7 @@ fn exitError(err: anyerror) !void {
         error.InvalidXdpProgram => "Invalid xdp program name",
         error.CliUsage => @import("CliArgs.zig").usage,
         else => {
-            try stderr.print("Failed to parse config: {t}\n", .{err});
+            try stderr.print("Err: {t}\n", .{err});
             break :sw null;
         },
     };

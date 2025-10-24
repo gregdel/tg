@@ -78,6 +78,11 @@ pub fn attach(cli_args: *const CliArgs) !void {
     try bpf.attach(dev, prog);
 }
 
+pub fn detach(cli_args: *const CliArgs) !void {
+    const dev = cli_args.dev orelse return error.CliUsage;
+    try bpf.detach(dev);
+}
+
 pub fn format(self: *const Tg, writer: anytype) !void {
     try writer.print("Stats\n", .{});
     try writer.print("-----\n", .{});
