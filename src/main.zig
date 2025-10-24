@@ -38,9 +38,11 @@ pub fn main() !void {
         },
         .attach => {
             Tg.attach(&cli_args) catch |err| return exitError(err);
+            try stdout.print("Program attached\n", .{});
         },
         .detach => {
             Tg.detach(&cli_args) catch |err| return exitError(err);
+            try stdout.print("Program detached\n", .{});
         },
     }
 

@@ -60,13 +60,13 @@ pub fn parse() !CliArgs {
     _ = args.skip();
 
     const cmd_str = args.next() orelse {
-        std.log.debug("Missing command", .{});
+        std.log.err("Missing command", .{});
         return error.CliUsage;
     };
 
     var cli: CliArgs = .{
         .cmd = cmd_map.get(cmd_str) orelse {
-            std.log.debug("Invalid command: {s}", .{cmd_str});
+            std.log.err("Invalid command: {s}", .{cmd_str});
             return error.CliUsage;
         },
     };
@@ -74,7 +74,7 @@ pub fn parse() !CliArgs {
     const cmd_args = cli.cmd.args();
     while (args.next()) |arg| {
         const arg_type = cmd_args.get(arg) orelse {
-            std.log.debug("Invalid argument: {s}", .{arg});
+            std.log.err("Invalid argument: {s}", .{arg});
             return error.CliUsage;
         };
 
