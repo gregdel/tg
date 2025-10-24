@@ -214,7 +214,7 @@ test "parse yaml" {
         \\    src: 1234
         \\    dst: 5678
     ;
-    const cli_args = CliArgs{ .cmd = .send };
+    const cli_args: CliArgs = .{};
     var config = try initRaw(std.testing.allocator, &cli_args, source, false);
     defer config.deinit();
 
@@ -234,7 +234,7 @@ test "parse yaml optional" {
         \\    dst: de:ad:be:ef:00:01
         \\    proto: ip
     ;
-    const cli_args = CliArgs{ .cmd = .send };
+    const cli_args: CliArgs = .{};
     var config = try initRaw(std.testing.allocator, &cli_args, source, false);
     defer config.deinit();
     try std.testing.expectEqual(config.layers.minSize(), config.socket_config.pkt_size);

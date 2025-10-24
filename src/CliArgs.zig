@@ -5,7 +5,6 @@ const CliArgs = @This();
 dev: ?[]const u8 = null,
 config: ?[]const u8 = null,
 prog: ?[]const u8 = null,
-cmd: Cmd,
 
 const ArgType = enum {
     help,
@@ -18,6 +17,7 @@ pub const usage =
     \\Usage:
     \\  tg [command] [args]
     \\Commands:
+    \\  help
     \\  send [dev DEV] [config PATH]
     \\  attach dev DEV prog [tg_drop|tg_pass]
     \\  detach dev DEV
@@ -26,11 +26,12 @@ pub const usage =
     \\  PATH   config file path
 ;
 const Cmd = enum {
+    help,
     send,
     attach,
     detach,
 
-    pub fn args(self: Cmd) std.StaticStringMap(ArgType) {
+    pub fn args(self: Cmd) !std.StaticStringMap(ArgType) {
         return switch (self) {
             .send => std.StaticStringMap(ArgType).initComptime(.{
                 .{ "dev", .dev },
@@ -46,16 +47,22 @@ const Cmd = enum {
                 .{ "dev", .dev },
                 .{ "help", .help },
             }),
+            .help => return error.CliUsage,
         };
     }
 };
-const cmd_map = std.StaticStringMap(Cmd).initComptime(.{
-    .{ "send", .send },
-    .{ "attach", .attach },
-    .{ "detach", .detach },
-});
 
-pub fn parse() !CliArgs {
+pub const CmdCtx = struct {
+    cmd: Cmd,
+    func: *const fn (*const CliArgs) anyerror!void,
+};
+
+pub const CliCmd = struct {
+    ctx: CmdCtx,
+    args: CliArgs = .{},
+};
+
+pub fn parse(commands: std.StaticStringMap(CmdCtx)) !CliCmd {
     var args = std.process.args();
     _ = args.skip();
 
@@ -64,14 +71,14 @@ pub fn parse() !CliArgs {
         return error.CliUsage;
     };
 
-    var cli: CliArgs = .{
-        .cmd = cmd_map.get(cmd_str) orelse {
-            std.log.err("Invalid command: {s}", .{cmd_str});
-            return error.CliUsage;
-        },
+    const ctx = commands.get(cmd_str) orelse {
+        std.log.err("Invalid command: {s}", .{cmd_str});
+        return error.CliUsage;
     };
 
-    const cmd_args = cli.cmd.args();
+    var cmd: CliCmd = .{ .ctx = ctx };
+
+    const cmd_args = try ctx.cmd.args();
     while (args.next()) |arg| {
         const arg_type = cmd_args.get(arg) orelse {
             std.log.err("Invalid argument: {s}", .{arg});
@@ -80,13 +87,13 @@ pub fn parse() !CliArgs {
 
         switch (arg_type) {
             .dev => {
-                cli.dev = args.next() orelse return error.CliUsage;
+                cmd.args.dev = args.next() orelse return error.CliUsage;
             },
             .config => {
-                cli.config = args.next() orelse return error.CliUsage;
+                cmd.args.config = args.next() orelse return error.CliUsage;
             },
             .prog => {
-                cli.prog = args.next() orelse return error.CliUsage;
+                cmd.args.prog = args.next() orelse return error.CliUsage;
             },
             .help => {
                 return error.CliUsage;
@@ -94,5 +101,5 @@ pub fn parse() !CliArgs {
         }
     }
 
-    return cli;
+    return cmd;
 }
