@@ -20,6 +20,7 @@ pub const usage =
     \\Commands:
     \\  send [dev DEV] [config PATH]
     \\  attach dev DEV prog [tg_drop|tg_pass]
+    \\  detach dev DEV
     \\Arguments:
     \\  DEV    device to use
     \\  PATH   config file path
@@ -27,6 +28,7 @@ pub const usage =
 const Cmd = enum {
     send,
     attach,
+    detach,
 
     pub fn args(self: Cmd) std.StaticStringMap(ArgType) {
         return switch (self) {
@@ -40,12 +42,17 @@ const Cmd = enum {
                 .{ "prog", .prog },
                 .{ "help", .help },
             }),
+            .detach => std.StaticStringMap(ArgType).initComptime(.{
+                .{ "dev", .dev },
+                .{ "help", .help },
+            }),
         };
     }
 };
 const cmd_map = std.StaticStringMap(Cmd).initComptime(.{
     .{ "send", .send },
     .{ "attach", .attach },
+    .{ "detach", .detach },
 });
 
 pub fn parse() !CliArgs {
