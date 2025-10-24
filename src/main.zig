@@ -3,6 +3,7 @@ const std = @import("std");
 const Tg = @import("Tg.zig");
 const Config = @import("Config.zig");
 const CliArgs = @import("CliArgs.zig");
+const CmdCtx = @import("CliArgs.zig").CmdCtx;
 
 pub const max_layers = @import("layers/Layers.zig").max_layers;
 
@@ -14,44 +15,56 @@ pub const std_options: std.Options = .{
     },
 };
 
-fn run() !void {
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    const stdout = &stdout_writer.interface;
+var stdout_buffer: [1024]u8 = undefined;
+var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+const stdout = &stdout_writer.interface;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-
-    const cli_args = try CliArgs.parse();
-    switch (cli_args.cmd) {
-        .send => {
-            const config = try Config.init(allocator, &cli_args);
-            defer config.deinit();
-            try stdout.print("{f}", .{config});
-            try stdout.flush();
-
-            var tg = try Tg.init(&config);
-            try tg.run();
-
-            try stdout.print("\n{f}", .{tg});
-        },
-        .attach => {
-            try Tg.attach(&cli_args);
-            try stdout.print("Program attached\n", .{});
-        },
-        .detach => {
-            try Tg.detach(&cli_args);
-            try stdout.print("Program detached\n", .{});
-        },
-    }
-
-    try stdout.flush();
-}
+const cmds = std.StaticStringMap(CmdCtx).initComptime(.{
+    .{ "help", CmdCtx{ .cmd = .help, .func = help } },
+    .{ "send", CmdCtx{ .cmd = .send, .func = send } },
+    .{ "attach", CmdCtx{ .cmd = .attach, .func = attach } },
+    .{ "detach", CmdCtx{ .cmd = .detach, .func = detach } },
+});
 
 pub fn main() !void {
     run() catch |err| return exitError(err);
 }
+
+fn run() !void {
+    const cmd = try CliArgs.parse(cmds);
+    try cmd.ctx.func(&cmd.args);
+}
+
+fn detach(cli_args: *const CliArgs) !void {
+    try Tg.detach(cli_args);
+    try stdout.print("Program detached\n", .{});
+    try stdout.flush();
+}
+
+fn attach(cli_args: *const CliArgs) !void {
+    try Tg.attach(cli_args);
+    try stdout.print("Program attached\n", .{});
+    try stdout.flush();
+}
+
+fn send(cli_args: *const CliArgs) !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const config = try Config.init(allocator, cli_args);
+    defer config.deinit();
+    try stdout.print("{f}", .{config});
+    try stdout.flush();
+
+    var tg = try Tg.init(&config);
+    try tg.run();
+
+    try stdout.print("\n{f}", .{tg});
+    try stdout.flush();
+}
+
+fn help(_: *const CliArgs) !void {}
 
 fn exitError(err: anyerror) !void {
     var stderr_buffer: [1024]u8 = undefined;
