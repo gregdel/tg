@@ -14,7 +14,7 @@ pub const std_options: std.Options = .{
     },
 };
 
-pub fn main() !void {
+fn run() !void {
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
@@ -23,10 +23,10 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const cli_args = CliArgs.parse() catch |err| return exitError(err);
+    const cli_args = try CliArgs.parse();
     switch (cli_args.cmd) {
         .send => {
-            const config = Config.init(allocator, &cli_args) catch |err| return exitError(err);
+            const config = try Config.init(allocator, &cli_args);
             defer config.deinit();
             try stdout.print("{f}", .{config});
             try stdout.flush();
@@ -37,16 +37,20 @@ pub fn main() !void {
             try stdout.print("\n{f}", .{tg});
         },
         .attach => {
-            Tg.attach(&cli_args) catch |err| return exitError(err);
+            try Tg.attach(&cli_args);
             try stdout.print("Program attached\n", .{});
         },
         .detach => {
-            Tg.detach(&cli_args) catch |err| return exitError(err);
+            try Tg.detach(&cli_args);
             try stdout.print("Program detached\n", .{});
         },
     }
 
     try stdout.flush();
+}
+
+pub fn main() !void {
+    run() catch |err| return exitError(err);
 }
 
 fn exitError(err: anyerror) !void {
