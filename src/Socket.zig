@@ -38,23 +38,27 @@ pub const SocketConfig = struct {
     pre_fill: bool,
 
     pub fn format(self: *const SocketConfig, writer: anytype) !void {
-        const fmt = "{s: <18}";
-        const fmtNumber = fmt ++ ": {d}\n";
-        const fmtBool = fmt ++ ": {}\n";
-        try writer.print(fmtNumber, .{ "Ring size", ring_size });
-        try writer.print(fmtNumber, .{ "Packet batch", self.pkt_batch });
-        try writer.print(fmtNumber, .{ "Packet size", self.pkt_size });
+        try writer.print(
+            \\Socket config:
+            \\  Ring size:{d}
+            \\  UMEM entries:{d} pre-fill:{}
+            \\  Packet batch:{d} size:{d}
+        ,
+            .{
+                ring_size,
+                self.entries,
+                self.pre_fill,
+                self.pkt_batch,
+                self.pkt_size,
+            },
+        );
+
         if (self.frames_per_packet > 1) {
-            try writer.print(fmtNumber, .{
-                "Frames per packet",
-                self.frames_per_packet,
-            });
+            try writer.print("\n  Frames per packet:{d}", .{self.frames_per_packet});
         }
-        try writer.print(fmtNumber, .{ "Entries", self.entries });
         if (self.pkt_count != null) {
-            try writer.print(fmtNumber, .{ "Packet count", self.pkt_count.? });
+            try writer.print("\n  Packet count:{d}", .{self.pkt_count.?});
         }
-        try writer.print(fmtBool, .{ "Pre-Fill", self.pre_fill });
     }
 };
 

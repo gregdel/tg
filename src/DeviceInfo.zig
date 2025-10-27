@@ -60,18 +60,15 @@ pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
         "Unknown";
 
     try writer.print(
-        \\Device info
-        \\-----------
-        \\Name    : {s} (index:{d})
-        \\MTU     : {d}
-        \\Address : {f}
-        \\Queues  : {d}
-        \\Speed   : {s}
-        \\Capabilities:
-        \\  Zerocopy     : {} (max frames:{d})
-        \\  Multi buffer : {}
-        \\-----------
-        \\
+        \\Device:
+        \\  Name: {s} (index:{d})
+        \\  MTU: {d}
+        \\  Address: {f}
+        \\  Queues: {d}
+        \\  Speed: {s}
+        \\  Capabilities:
+        \\    Zerocopy: {} (max frames:{d})
+        \\    Multi buffer: {}
     ,
         .{
             self.name,

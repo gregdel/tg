@@ -17,15 +17,11 @@ pub fn add(self: *Stats, other: *const Stats) void {
 }
 
 pub fn format(self: *const Stats, writer: anytype) !void {
-    const fmt = "{s: <13}: ";
-    try writer.print(fmt ++ "pending:{d} sent:{d}\n", .{
-        "frames",
-        self.frames_pending,
-        self.frames_sent,
-    });
-    try writer.print(fmt ++ "invalid_desc:{d} ring_empty_descs:{d}\n", .{
-        "tx",
-        self.tx_invalid_descs,
-        self.tx_ring_empty_descs,
+    try writer.print(
+        \\  Frames pending:{d} sent{d}
+        \\  Tx desc_invalid:{d} ring_empty:{d}
+    , .{
+        self.frames_pending,   self.frames_sent,
+        self.tx_invalid_descs, self.tx_ring_empty_descs,
     });
 }

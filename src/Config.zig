@@ -147,14 +147,20 @@ pub fn deinit(self: *const Config) void {
 }
 
 pub fn format(self: *const Config, writer: anytype) !void {
-    const fmt = "{s: <18}";
-    const fmtTitle = fmt ++ ":\n";
-    const fmtNumber = fmt ++ ": {d}\n";
-    try writer.print("{f}", .{self.device_info});
-    try writer.print("{f}", .{self.socket_config});
-    try writer.print(fmtNumber, .{ "Threads", self.threads });
-    try writer.print(fmtTitle, .{"Layers"});
-    try writer.print("{f}", .{self.layers});
+    try writer.print(
+        \\{f}
+        \\{f}
+        \\Threads: {d}
+        \\Layers:
+        \\{f}
+    ,
+        .{
+            self.device_info,
+            self.socket_config,
+            self.threads,
+            self.layers,
+        },
+    );
 }
 
 fn parseBool(str: []const u8) !bool {
