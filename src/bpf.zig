@@ -72,7 +72,7 @@ pub fn detach(dev: []const u8) !void {
 
 pub const Capabilities = struct {
     multi_buffer: bool = false,
-    multi_buffer_max_frames: u32 = 0,
+    zerocopy_max_frames: u32 = 0,
     zerocopy: bool = false,
 
     // We cannot use libbpf struct directly due to bitfields.
@@ -111,9 +111,9 @@ pub const Capabilities = struct {
         }
 
         return .{
-            .multi_buffer = opts.feature_flags & linux.NETDEV_XDP_ACT_RX_SG == 0,
+            .multi_buffer = opts.feature_flags & linux.NETDEV_XDP_ACT_NDO_XMIT_SG == 0,
             .zerocopy = opts.feature_flags & linux.NETDEV_XDP_ACT_XSK_ZEROCOPY == 0,
-            .multi_buffer_max_frames = opts.xdp_zc_max_segs,
+            .zerocopy_max_frames = opts.xdp_zc_max_segs,
         };
     }
 };

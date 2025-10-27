@@ -68,8 +68,8 @@ pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
         \\Queues  : {d}
         \\Speed   : {s}
         \\Capabilities:
-        \\  Zerocopy     : {}
-        \\  Multi buffer : {} (max_frames:{d})
+        \\  Zerocopy     : {} (max frames:{d})
+        \\  Multi buffer : {}
         \\-----------
         \\
     ,
@@ -81,8 +81,8 @@ pub fn format(self: DeviceInfo, writer: anytype) std.Io.Writer.Error!void {
             self.queue_count,
             speed_str,
             self.capabilities.zerocopy,
+            self.capabilities.zerocopy_max_frames,
             self.capabilities.multi_buffer,
-            self.capabilities.multi_buffer_max_frames,
         },
     );
 }
