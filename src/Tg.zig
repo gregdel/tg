@@ -84,12 +84,15 @@ pub fn detach(cli_args: *const CliArgs) !void {
 }
 
 pub fn format(self: *const Tg, writer: anytype) !void {
-    try writer.print("Stats\n", .{});
-    try writer.print("-----\n", .{});
-    try writer.print("{s: <13}: {d}\n", .{
-        "packets sent",
-        self.stats.frames_sent / self.config.socket_config.frames_per_packet,
-    });
-    try writer.print("{f}", .{self.stats});
-    try writer.print("\n", .{});
+    try writer.print(
+        \\Stats:
+        \\  Packets sent: {d}
+        \\{f}
+        \\
+    ,
+        .{
+            self.stats.frames_sent / self.config.socket_config.frames_per_packet,
+            self.stats,
+        },
+    );
 }
