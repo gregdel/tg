@@ -1,5 +1,6 @@
 const Eth = @import("Eth.zig");
 const Ip = @import("Ip.zig");
+const Ipv6 = @import("Ipv6.zig");
 const Udp = @import("Udp.zig");
 const Vlan = @import("Vlan.zig");
 const Vxlan = @import("Vxlan.zig");
@@ -7,6 +8,7 @@ const Vxlan = @import("Vxlan.zig");
 pub const Layer = union(enum) {
     eth: Eth,
     ip: Ip,
+    ipv6: Ipv6,
     udp: Udp,
     vlan: Vlan,
     vxlan: Vxlan,
@@ -24,13 +26,14 @@ pub const Layer = union(enum) {
     pub fn pseudoHeaderCksum(self: *const Layer, data: []const u8) !u16 {
         return switch (self.*) {
             .ip => |layer| layer.pseudoHeaderCksum(data),
+            .ipv6 => |layer| layer.pseudoHeaderCksum(data),
             inline else => 0,
         };
     }
 
     pub fn updateCksum(self: *const Layer, data: []u8, pseudo_header_cksum: u16) !void {
         return switch (self.*) {
-            .eth, .vlan, .vxlan => {},
+            .eth, .vlan, .vxlan, .ipv6 => {},
             inline else => |layer| try layer.updateCksum(data, pseudo_header_cksum),
         };
     }

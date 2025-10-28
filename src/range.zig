@@ -2,6 +2,7 @@ const std = @import("std");
 
 const MacAddr = @import("net/MacAddr.zig");
 const IpAddr = @import("net/IpAddr.zig");
+const Ipv6Addr = @import("net/Ipv6Addr.zig");
 
 const RangeError = error{
     EndBeforeStart,
@@ -40,6 +41,7 @@ pub fn Range(comptime T: type) type {
                 else => switch (T) {
                     MacAddr => MacAddr.fromInt(value),
                     IpAddr => IpAddr.fromInt(value),
+                    Ipv6Addr => Ipv6Addr.fromInt(value),
                     else => @compileError("Unsupported type:" ++ @typeName(T)),
                 },
             };
@@ -51,6 +53,7 @@ pub fn Range(comptime T: type) type {
                 else => switch (T) {
                     MacAddr => value.toInt(),
                     IpAddr => value.toInt(),
+                    Ipv6Addr => value.toInt(),
                     else => @compileError("Unsupported type:" ++ @typeName(T)),
                 },
             };
@@ -69,6 +72,7 @@ pub fn Range(comptime T: type) type {
                     else => switch (T) {
                         MacAddr => MacAddr.parse(part),
                         IpAddr => IpAddr.parse(part),
+                        Ipv6Addr => Ipv6Addr.parse(part),
                         else => @compileError("Unsupported type:" ++ @typeName(T)),
                     },
                 };
@@ -163,5 +167,24 @@ test "range of ip" {
     );
     const result = ipaddr_range.get(2);
     const expected = try IpAddr.parse("192.168.1.2");
+    try std.testing.expectEqual(expected, result);
+}
+
+test "parse range of ipv6" {
+    const ipv6_range = try Range(Ipv6Addr).parse("2001::-2002::");
+    const expected_range = try Range(Ipv6Addr).init(
+        try Ipv6Addr.parse("2001::"),
+        try Ipv6Addr.parse("2002::"),
+    );
+    try std.testing.expectEqual(expected_range, ipv6_range);
+}
+
+test "range of ipv6" {
+    const range = try Range(Ipv6Addr).init(
+        try Ipv6Addr.parse("2001::"),
+        try Ipv6Addr.parse("2002::"),
+    );
+    const result = range.get(2);
+    const expected = try Ipv6Addr.parse("2001:0:0:2::");
     try std.testing.expectEqual(expected, result);
 }
