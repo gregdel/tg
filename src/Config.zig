@@ -45,7 +45,7 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     const tmp_dev = if (cli_args.dev) |dev|
         dev
     else
-        getValue([]const u8, map.get("dev")) catch return error.ConfigMissingDev;
+        getStringValue(map, "dev") catch return error.ConfigMissingDev;
 
     const dev = try allocator.dupe(u8, tmp_dev);
     errdefer allocator.free(dev);
@@ -61,42 +61,42 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     var layers = Layers{};
     for (layer_list) |layer_value| {
         const layer = layer_value.asMap() orelse return error.InvalidYaml;
-        const layer_type = std.meta.stringToEnum(std.meta.Tag(Layer), try getValue(
-            []const u8,
-            layer.get("type"),
-        )) orelse return error.InvalidYaml;
+        const layer_type = std.meta.stringToEnum(
+            std.meta.Tag(Layer),
+            try getStringValue(layer, "type"),
+        ) orelse return error.InvalidYaml;
 
         switch (layer_type) {
             .eth => try layers.addLayer(.{ .eth = .{
-                .src = try Range(MacAddr).parse(try getValue([]const u8, layer.get("src"))),
-                .dst = try Range(MacAddr).parse(try getValue([]const u8, layer.get("dst"))),
-                .proto = try Eth.parseEthProto(try getValue(?[]const u8, layer.get("proto"))),
+                .src = try Range(MacAddr).parse(try getStringValue(layer, "src")),
+                .dst = try Range(MacAddr).parse(try getStringValue(layer, "dst")),
+                .proto = try Eth.parseEthProto(try getOptionalStringValue(layer, "proto")),
             } }),
             .vlan => try layers.addLayer(.{ .vlan = .{
-                .vlan = try Range(u12).parse(try getValue([]const u8, layer.get("vlan"))),
-                .proto = try Eth.parseEthProto(try getValue(?[]const u8, layer.get("proto"))),
+                .vlan = try Range(u12).parse(try getStringValue(layer, "vlan")),
+                .proto = try Eth.parseEthProto(try getOptionalStringValue(layer, "proto")),
             } }),
             .vxlan => try layers.addLayer(.{ .vxlan = .{
-                .vni = try Range(u24).parse(try getValue([]const u8, layer.get("vni"))),
+                .vni = try Range(u24).parse(try getStringValue(layer, "vni")),
             } }),
             .ip => try layers.addLayer(.{ .ip = .{
-                .saddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("src"))),
-                .daddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("dst"))),
-                .protocol = try Ip.parseIpProto(try getValue(?[]const u8, layer.get("proto"))),
+                .saddr = try Range(IpAddr).parse(try getStringValue(layer, "src")),
+                .daddr = try Range(IpAddr).parse(try getStringValue(layer, "dst")),
+                .protocol = try Ip.parseIpProto(try getOptionalStringValue(layer, "proto")),
             } }),
             .udp => try layers.addLayer(.{ .udp = .{
-                .source = try getIntRangeValue(u16, layer.get("src")),
-                .dest = try getIntRangeValue(u16, layer.get("dst")),
+                .source = try getIntRangeValue(u16, layer, "src"),
+                .dest = try getIntRangeValue(u16, layer, "dst"),
             } }),
         }
     }
 
-    const pkt_size = try getValue(?u16, map.get("pkt_size")) orelse layers.minSize();
+    const pkt_size = try getValue(?u16, map, "pkt_size") orelse layers.minSize();
     layers.fixSize(pkt_size);
     try layers.fixMissingNextHeader();
 
     const frames_per_packet: u8 = @truncate(pkt_size / std.heap.pageSize() + 1);
-    var batch = try getValue(?u16, map.get("batch")) orelse default_batch;
+    var batch = try getValue(?u16, map, "batch") orelse default_batch;
     // Adjust the batch size to be a multiple of frames_per_packet
     batch -= batch % frames_per_packet;
 
@@ -105,7 +105,7 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     entries -= entries % frames_per_packet;
 
     // The number of threads might be limited by the number of queues
-    var threads = try getValue(?u32, map.get("threads")) orelse device_info.queue_count;
+    var threads = try getValue(?u32, map, "threads") orelse device_info.queue_count;
     threads = @min(threads, device_info.queue_count);
 
     return .{
@@ -118,8 +118,8 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .pkt_size = pkt_size,
             .entries = entries,
             .frames_per_packet = frames_per_packet,
-            .pre_fill = try getValue(?bool, map.get("pre_fill")) orelse false,
-            .pkt_count = try getValue(?u64, map.get("count")),
+            .pre_fill = try getValue(?bool, map, "pre_fill") orelse false,
+            .pkt_count = try getValue(?u64, map, "count"),
             .pkt_batch = batch,
             .layers = layers,
         },
@@ -153,14 +153,24 @@ fn parseBool(str: []const u8) !bool {
     return error.YamlInvalid;
 }
 
-fn getValue(comptime MaybeT: type, maybe_value: ?Yaml.Value) !MaybeT {
-    const optional = @typeInfo(MaybeT) == .optional;
+fn getStringValue(map: Yaml.Map, name: []const u8) ![]const u8 {
+    return getValue([]const u8, map, name);
+}
+
+fn getOptionalStringValue(map: Yaml.Map, name: []const u8) !?[]const u8 {
+    return getValue(?[]const u8, map, name);
+}
+
+fn getValue(comptime ValueT: type, map: Yaml.Map, name: []const u8) !ValueT {
+    const maybe_value = map.get(name);
+
+    const optional = @typeInfo(ValueT) == .optional;
     if (maybe_value == null) {
         return if (optional) null else error.YamlInvalid;
     }
 
     const value = maybe_value.?.asScalar() orelse return error.YamlInvalid;
-    const T = if (optional) @typeInfo(MaybeT).optional.child else MaybeT;
+    const T = if (optional) @typeInfo(ValueT).optional.child else ValueT;
 
     return switch (@typeInfo(T)) {
         .int => try std.fmt.parseInt(T, value, 10),
@@ -173,17 +183,17 @@ fn getValue(comptime MaybeT: type, maybe_value: ?Yaml.Value) !MaybeT {
     };
 }
 
-fn getIntRangeValue(comptime T: type, maybe_value: ?Yaml.Value) !Range(T) {
+fn getIntRangeValue(comptime T: type, map: Yaml.Map, name: []const u8) !Range(T) {
     if (@typeInfo(T) != .int) {
-        @compileError("This function only handles intergers");
+        @compileError("This function only handles integers");
     }
 
     // First try to parse the value as type T. If this fails, parse it as a
     // range from a string.
-    if (getValue(T, maybe_value)) |value| {
+    if (getValue(T, map, name)) |value| {
         return try Range(T).init(value, null);
     } else |_| {
-        return try Range(T).parse(try getValue([]const u8, maybe_value));
+        return try Range(T).parse(try getStringValue(map, name));
     }
 }
 
