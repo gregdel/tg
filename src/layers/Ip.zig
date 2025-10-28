@@ -83,7 +83,7 @@ pub fn format(self: *const Ip, writer: anytype) !void {
     }
 }
 
-const ipProto = enum(u8) {
+pub const ipProto = enum(u8) {
     ip = std.os.linux.IPPROTO.IP,
     icmp = std.os.linux.IPPROTO.ICMP,
     ipip = std.os.linux.IPPROTO.IPIP,

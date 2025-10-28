@@ -3,6 +3,7 @@ const std = @import("std");
 const Yaml = @import("yaml").Yaml;
 
 const IpAddr = @import("net/IpAddr.zig");
+const Ipv6Addr = @import("net/Ipv6Addr.zig");
 const MacAddr = @import("net/MacAddr.zig");
 const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
@@ -87,6 +88,11 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .udp => try layers.addLayer(.{ .udp = .{
                 .source = try getIntRangeValue(u16, layer, "src"),
                 .dest = try getIntRangeValue(u16, layer, "dst"),
+            } }),
+            .ipv6 => try layers.addLayer(.{ .ipv6 = .{
+                .saddr = try Range(Ipv6Addr).parse(try getStringValue(layer, "src")),
+                .daddr = try Range(Ipv6Addr).parse(try getStringValue(layer, "dst")),
+                .next_header = try Ip.parseIpProto(try getOptionalStringValue(layer, "next_header")),
             } }),
         }
     }
