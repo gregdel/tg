@@ -59,51 +59,35 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     const layer_list = layers_raw.asList() orelse return error.ConfigMissingLayers;
 
     var layers = Layers{};
-
     for (layer_list) |layer_value| {
         const layer = layer_value.asMap() orelse return error.InvalidYaml;
-        const layer_type = try getValue([]const u8, layer.get("type"));
+        const layer_type = std.meta.stringToEnum(std.meta.Tag(Layer), try getValue(
+            []const u8,
+            layer.get("type"),
+        )) orelse return error.InvalidYaml;
 
-        if (std.mem.eql(u8, layer_type, "eth")) {
-            try layers.addLayer(.{ .eth = .{
+        switch (layer_type) {
+            .eth => try layers.addLayer(.{ .eth = .{
                 .src = try Range(MacAddr).parse(try getValue([]const u8, layer.get("src"))),
                 .dst = try Range(MacAddr).parse(try getValue([]const u8, layer.get("dst"))),
-                .proto = try Eth.parseEthProto(
-                    try getValue(?[]const u8, layer.get("proto")),
-                ),
-            } });
-        }
-
-        if (std.mem.eql(u8, layer_type, "vlan")) {
-            try layers.addLayer(.{ .vlan = .{
+                .proto = try Eth.parseEthProto(try getValue(?[]const u8, layer.get("proto"))),
+            } }),
+            .vlan => try layers.addLayer(.{ .vlan = .{
                 .vlan = try Range(u12).parse(try getValue([]const u8, layer.get("vlan"))),
-                .proto = try Eth.parseEthProto(
-                    try getValue(?[]const u8, layer.get("proto")),
-                ),
-            } });
-        }
-
-        if (std.mem.eql(u8, layer_type, "vxlan")) {
-            try layers.addLayer(.{ .vxlan = .{
+                .proto = try Eth.parseEthProto(try getValue(?[]const u8, layer.get("proto"))),
+            } }),
+            .vxlan => try layers.addLayer(.{ .vxlan = .{
                 .vni = try Range(u24).parse(try getValue([]const u8, layer.get("vni"))),
-            } });
-        }
-
-        if (std.mem.eql(u8, layer_type, "ip")) {
-            try layers.addLayer(.{ .ip = .{
+            } }),
+            .ip => try layers.addLayer(.{ .ip = .{
                 .saddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("src"))),
                 .daddr = try Range(IpAddr).parse(try getValue([]const u8, layer.get("dst"))),
-                .protocol = try Ip.parseIpProto(
-                    try getValue(?[]const u8, layer.get("proto")),
-                ),
-            } });
-        }
-
-        if (std.mem.eql(u8, layer_type, "udp")) {
-            try layers.addLayer(.{ .udp = .{
+                .protocol = try Ip.parseIpProto(try getValue(?[]const u8, layer.get("proto"))),
+            } }),
+            .udp => try layers.addLayer(.{ .udp = .{
                 .source = try getIntRangeValue(u16, layer.get("src")),
                 .dest = try getIntRangeValue(u16, layer.get("dst")),
-            } });
+            } }),
         }
     }
 
