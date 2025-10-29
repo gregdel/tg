@@ -34,7 +34,7 @@ pub const SocketConfig = struct {
     frames_per_packet: u8,
     pkt_count: ?u64,
     pkt_batch: u32,
-    entries: u32,
+    umem_entries: u32,
     pre_fill: bool,
 
     pub fn format(self: *const SocketConfig, writer: anytype) !void {
@@ -46,7 +46,7 @@ pub const SocketConfig = struct {
         ,
             .{
                 ring_size,
-                self.entries,
+                self.umem_entries,
                 self.pre_fill,
                 self.pkt_batch,
                 self.pkt_size,
@@ -85,7 +85,7 @@ pub fn init(config: *const SocketConfig, stats: *Stats) !Socket {
     }
     try cpu_set.apply();
 
-    const size: usize = page_size * config.entries;
+    const size: usize = page_size * config.umem_entries;
 
     const addr = try std.posix.mmap(
         null,
@@ -165,7 +165,7 @@ pub fn deinit(self: *Socket) void {
 }
 
 fn umemAddr(self: *Socket, id: usize) usize {
-    return (id % self.config.entries) * page_size;
+    return (id % self.config.umem_entries) * page_size;
 }
 
 pub fn run(self: *Socket) !void {
@@ -189,7 +189,7 @@ pub fn run(self: *Socket) !void {
 }
 
 pub fn fillAll(self: *Socket) !void {
-    return self.fill(0, self.config.entries, 0);
+    return self.fill(0, self.config.umem_entries, 0);
 }
 
 pub fn fill(self: *Socket, id_start: usize, pkt_count: usize, seed_start: u64) !void {

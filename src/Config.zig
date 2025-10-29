@@ -26,7 +26,7 @@ const Config = @This();
 
 const default_batch = 64;
 const max_file_size = 100_000; // ~100ko
-const default_entries = @import("Socket.zig").ring_size;
+const default_umem_entries = @import("Socket.zig").ring_size;
 
 pub fn init(allocator: std.mem.Allocator, cli_args: *const CliArgs) !Config {
     if (cli_args.config == null) return error.MissingConfigFile;
@@ -102,13 +102,16 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     try layers.fixMissingNextHeader();
 
     const frames_per_packet: u8 = @truncate(pkt_size / std.heap.pageSize() + 1);
+
+    // Adjust the umem entries to be a multiple of frames_per_packet
+    var umem_entries: u32 = try getValue(?u32, map, "umem_entries") orelse default_umem_entries;
+    umem_entries -= umem_entries % frames_per_packet;
+
     var batch = try getValue(?u16, map, "batch") orelse default_batch;
     // Adjust the batch size to be a multiple of frames_per_packet
     batch -= batch % frames_per_packet;
-
-    // Adjust the umem entries to be a multiple of frames_per_packet
-    var entries: u32 = default_entries;
-    entries -= entries % frames_per_packet;
+    // Batches should not be smaller than the number of umem entries
+    batch = @min(batch, umem_entries);
 
     // The number of threads might be limited by the number of queues
     var threads = try getValue(?u32, map, "threads") orelse device_info.queue_count;
@@ -122,7 +125,7 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
         .socket_config = .{
             .dev = dev,
             .pkt_size = pkt_size,
-            .entries = entries,
+            .umem_entries = umem_entries,
             .frames_per_packet = frames_per_packet,
             .pre_fill = try getValue(?bool, map, "pre_fill") orelse false,
             .pkt_count = try getValue(?u64, map, "count"),
