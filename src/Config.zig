@@ -113,9 +113,15 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     // Batches should not be smaller than the number of umem entries
     batch = @min(batch, umem_entries);
 
+    const pkt_count = try getValue(?u64, map, "count");
+
     // The number of threads might be limited by the number of queues
     var threads = try getValue(?u32, map, "threads") orelse device_info.queue_count;
     threads = @min(threads, device_info.queue_count);
+    if (pkt_count) |count| {
+        // Don't use more threads than packets to send
+        threads = @min(threads, count);
+    }
 
     return .{
         .allocator = allocator,
@@ -128,7 +134,7 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .umem_entries = umem_entries,
             .frames_per_packet = frames_per_packet,
             .pre_fill = try getValue(?bool, map, "pre_fill") orelse false,
-            .pkt_count = try getValue(?u64, map, "count"),
+            .pkt_count = pkt_count,
             .pkt_batch = batch,
             .layers = layers,
         },
