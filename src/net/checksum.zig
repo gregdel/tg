@@ -9,7 +9,7 @@ pub fn cksum(data: []const u8, seed: u16) !u16 {
         if (remaining == 1) {
             sum += @as(u32, data[pos]) << 8;
         } else {
-            sum += std.mem.readVarInt(u16, data[pos .. pos + 2], .big);
+            sum += std.mem.readInt(u16, data[pos..][0..2], .big);
         }
     }
 
