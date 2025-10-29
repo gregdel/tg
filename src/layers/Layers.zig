@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Layer = @import("layer.zig").Layer;
 
-pub const max_layers = 8;
+pub const max_layers = 12;
 
 pub const Layers = @This();
 
@@ -15,7 +15,7 @@ pub fn asSlice(self: *const Layers) []const Layer {
 
 pub fn minSize(self: *Layers) u16 {
     var size: u16 = 0;
-    for (self.entries[0..self.count]) |layer| {
+    for (self.asSlice()) |layer| {
         size += layer.size();
     }
     return size;
@@ -32,9 +32,8 @@ pub fn fixSize(self: *Layers, total: u16) void {
 pub fn fixMissingNextHeader(self: *Layers) !void {
     for (0..self.count - 1) |i| {
         const j = i + 1;
-        const next_proto = self.entries[j].getProto();
-        if (next_proto == null) continue;
-        self.entries[i].setNextProto(next_proto.?) catch |err| {
+        const next_proto = self.entries[j].getProto() orelse continue;
+        self.entries[i].setNextProto(next_proto) catch |err| {
             switch (err) {
                 error.AlreadySet => continue,
                 else => return err,
@@ -50,7 +49,7 @@ pub fn addLayer(self: *Layers, layer: Layer) !void {
 }
 
 pub fn format(self: *const Layers, writer: anytype) !void {
-    for (self.entries[0..self.count]) |*layer| {
+    for (self.asSlice()) |layer| {
         try writer.print("{s: >6} : {f}\n", .{ layer.name(), layer });
     }
 }
