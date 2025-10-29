@@ -43,6 +43,21 @@ pub fn threadRun(ctx: *ThreadContext) !void {
     try socket.updateXskStats();
 }
 
+pub fn thread_pkt_count(self: *const Tg, thread: usize) ?u64 {
+    return pkt_count(
+        self.config.socket_config.pkt_count,
+        self.config.threads,
+        thread,
+    );
+}
+
+pub fn pkt_count(count: ?u64, threads: u32, thread: usize) ?u64 {
+    const total = count orelse return null;
+    const per_thread = total / threads;
+    const remaining = total % threads;
+    return if (thread < remaining) per_thread + 1 else per_thread;
+}
+
 pub fn run(self: *Tg) !void {
     // TODO: cache align ?
     var threads: [max_queues]std.Thread = undefined;
@@ -58,6 +73,7 @@ pub fn run(self: *Tg) !void {
         var ctx = &threads_ctx[queue_id];
         ctx.config.queue_id = @truncate(queue_id);
         ctx.config.affinity = self.config.device_info.queues[queue_id] orelse CpuSet.zero();
+        ctx.config.pkt_count = self.thread_pkt_count(queue_id);
 
         threads[queue_id] = try std.Thread.spawn(.{}, Tg.threadRun, .{ctx});
         const name = try std.fmt.bufPrint(&buf, "tg_q_{d}", .{queue_id});
@@ -95,4 +111,24 @@ pub fn format(self: *const Tg, writer: anytype) !void {
             self.stats,
         },
     );
+}
+
+test "pkt_count" {
+    // 10 packets total on 5 threads -> 2 per thread
+    inline for (0..5) |thread| {
+        try std.testing.expectEqual(2, pkt_count(10, 5, thread));
+    }
+
+    // 6 packets total on 4 threads:
+    // Thread 0 -> 2
+    // Thread 1 -> 2
+    // Thread 2 -> 1
+    // Thread 3 -> 1
+    try std.testing.expectEqual(2, pkt_count(6, 4, 0));
+    try std.testing.expectEqual(2, pkt_count(6, 4, 1));
+    try std.testing.expectEqual(1, pkt_count(6, 4, 2));
+    try std.testing.expectEqual(1, pkt_count(6, 4, 3));
+
+    // No limit
+    try std.testing.expectEqual(null, pkt_count(null, 1, 0));
 }

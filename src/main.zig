@@ -101,13 +101,14 @@ fn exitError(err: anyerror) !void {
 }
 
 test {
-    _ = @import("DeviceInfo.zig");
     _ = @import("Config.zig");
-    _ = @import("net/checksum.zig");
+    _ = @import("CpuSet.zig");
+    _ = @import("DeviceInfo.zig");
+    _ = @import("Tg.zig");
+    _ = @import("layers/Ip.zig");
     _ = @import("net/IpAddr.zig");
     _ = @import("net/Ipv6Addr.zig");
-    _ = @import("layers/Ip.zig");
-    _ = @import("range.zig");
-    _ = @import("CpuSet.zig");
+    _ = @import("net/checksum.zig");
     _ = @import("pretty.zig");
+    _ = @import("range.zig");
 }
