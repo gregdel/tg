@@ -10,6 +10,7 @@ const DeviceInfo = @import("DeviceInfo.zig");
 const SocketConfig = @import("Socket.zig").SocketConfig;
 const CliArgs = @import("CliArgs.zig");
 const bpf = @import("bpf.zig");
+const pretty = @import("pretty.zig");
 
 const Ip = @import("layers/Ip.zig");
 const Eth = @import("layers/Eth.zig");
@@ -188,7 +189,7 @@ fn getValue(comptime ValueT: type, map: Yaml.Map, name: []const u8) !ValueT {
     const T = if (optional) @typeInfo(ValueT).optional.child else ValueT;
 
     return switch (@typeInfo(T)) {
-        .int => try std.fmt.parseInt(T, value, 10),
+        .int => try pretty.parseNumber(T, value),
         .bool => try parseBool(value),
         .pointer => |info| switch (info.size) {
             .slice => return value,
