@@ -1,5 +1,3 @@
-const std = @import("std");
-
 const XdpAction = enum(c_long) {
     XDP_ABORTED,
     XDP_DROP,

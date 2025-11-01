@@ -1,5 +1,3 @@
-const std = @import("std");
-
 const Stats = @This();
 
 frames_pending: u32 = 0,

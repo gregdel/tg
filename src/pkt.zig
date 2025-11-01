@@ -1,10 +1,5 @@
 const std = @import("std");
 
-const cksum = @import("net/checksum.zig");
-
-const MacAddr = @import("net/MacAddr.zig");
-const IpAddr = @import("net/IpAddr.zig");
-
 const Layers = @import("layers/Layers.zig");
 
 pub fn build(layers: Layers, buf: []u8, seed: u64) !void {

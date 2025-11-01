@@ -9,7 +9,6 @@ const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
 const SocketConfig = @import("Socket.zig").SocketConfig;
 const CliArgs = @import("CliArgs.zig");
-const bpf = @import("bpf.zig");
 const pretty = @import("pretty.zig");
 
 const Ip = @import("layers/Ip.zig");

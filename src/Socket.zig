@@ -2,7 +2,6 @@ const std = @import("std");
 
 const signal = @import("signal.zig");
 const pkt = @import("pkt.zig");
-const Config = @import("Config.zig");
 const CpuSet = @import("CpuSet.zig");
 const Stats = @import("Stats.zig");
 const Layers = @import("layers/Layers.zig");
