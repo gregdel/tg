@@ -1,4 +1,5 @@
 const Eth = @import("Eth.zig");
+const Gre = @import("Gre.zig");
 const Ip = @import("Ip.zig");
 const Ipv6 = @import("Ipv6.zig");
 const Udp = @import("Udp.zig");
@@ -7,6 +8,7 @@ const Vxlan = @import("Vxlan.zig");
 
 pub const Layer = union(enum) {
     eth: Eth,
+    gre: Gre,
     ip: Ip,
     ipv6: Ipv6,
     udp: Udp,
@@ -33,14 +35,14 @@ pub const Layer = union(enum) {
 
     pub fn updateCksum(self: *const Layer, data: []u8, pseudo_header_cksum: u16) !void {
         return switch (self.*) {
-            .eth, .vlan, .vxlan, .ipv6 => {},
+            .eth, .gre, .ipv6, .vlan, .vxlan => {},
             inline else => |layer| try layer.updateCksum(data, pseudo_header_cksum),
         };
     }
 
     pub fn setLen(self: *Layer, len: u16) void {
         return switch (self.*) {
-            .eth, .vlan, .vxlan => {},
+            .eth, .gre, .vlan, .vxlan => {},
             inline else => |*layer| layer.setLen(len),
         };
     }

@@ -73,6 +73,9 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
                 .dst = try Range(MacAddr).parse(try getStringValue(layer, "dst")),
                 .proto = try Eth.parseEthProto(try getOptionalStringValue(layer, "proto")),
             } }),
+            .gre => try layers.addLayer(.{ .gre = .{
+                .proto = try Eth.parseEthProto(try getOptionalStringValue(layer, "proto")),
+            } }),
             .vlan => try layers.addLayer(.{ .vlan = .{
                 .vlan = try Range(u12).parse(try getStringValue(layer, "vlan")),
                 .proto = try Eth.parseEthProto(try getOptionalStringValue(layer, "proto")),
