@@ -1,5 +1,3 @@
-const std = @import("std");
-
 const Range = @import("../range.zig").Range;
 
 const Vxlan = @This();
