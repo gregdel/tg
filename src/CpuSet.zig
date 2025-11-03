@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub const CpuSet = @This();
+const CpuSet = @This();
 
 value: std.os.linux.cpu_set_t,
 

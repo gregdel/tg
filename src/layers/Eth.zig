@@ -1,5 +1,3 @@
-const std = @import("std");
-
 const Eth = @This();
 
 const MacAddr = @import("../net/MacAddr.zig");

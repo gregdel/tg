@@ -23,7 +23,7 @@ const ThreadContext = struct {
     }
 };
 
-pub const Tg = @This();
+const Tg = @This();
 
 config: *const Config,
 stats: Stats = .{},

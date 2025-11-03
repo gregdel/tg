@@ -22,7 +22,7 @@ pub fn zero() IpAddr {
     return .{ .bytes = .{0} ** 4 };
 }
 
-pub inline fn write(self: *const IpAddr, writer: *std.Io.Writer) !usize {
+pub fn write(self: *const IpAddr, writer: *std.Io.Writer) !usize {
     return writer.write(&self.bytes);
 }
 

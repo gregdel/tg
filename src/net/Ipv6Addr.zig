@@ -13,7 +13,7 @@ pub fn zero() Ipv6Addr {
     return .{ .bytes = .{0} ** 16 };
 }
 
-pub inline fn write(self: *const Ipv6Addr, writer: *std.Io.Writer) !usize {
+pub fn write(self: *const Ipv6Addr, writer: *std.Io.Writer) !usize {
     return writer.write(&self.bytes);
 }
 
