@@ -106,6 +106,7 @@ test {
     _ = @import("DeviceInfo.zig");
     _ = @import("Tg.zig");
     _ = @import("layers/Ip.zig");
+    _ = @import("net/EthProto.zig");
     _ = @import("net/IpAddr.zig");
     _ = @import("net/Ipv6Addr.zig");
     _ = @import("net/checksum.zig");

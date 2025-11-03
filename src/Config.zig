@@ -5,6 +5,7 @@ const Yaml = @import("yaml").Yaml;
 const IpAddr = @import("net/IpAddr.zig");
 const Ipv6Addr = @import("net/Ipv6Addr.zig");
 const MacAddr = @import("net/MacAddr.zig");
+const EthProto = @import("net/EthProto.zig");
 const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
 const SocketConfig = @import("Socket.zig").SocketConfig;
@@ -12,7 +13,6 @@ const CliArgs = @import("CliArgs.zig");
 const pretty = @import("pretty.zig");
 
 const Ip = @import("layers/Ip.zig");
-const Eth = @import("layers/Eth.zig");
 const Layers = @import("layers/Layers.zig");
 const Layer = @import("layers/layer.zig").Layer;
 
@@ -71,14 +71,14 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .eth => try layers.addLayer(.{ .eth = .{
                 .src = try Range(MacAddr).parse(try getStringValue(layer, "src")),
                 .dst = try Range(MacAddr).parse(try getStringValue(layer, "dst")),
-                .proto = try Eth.parseEthProto(try getOptionalStringValue(layer, "proto")),
+                .proto = try EthProto.init(try getOptionalStringValue(layer, "proto")),
             } }),
             .gre => try layers.addLayer(.{ .gre = .{
-                .proto = try Eth.parseEthProto(try getOptionalStringValue(layer, "proto")),
+                .proto = try EthProto.init(try getOptionalStringValue(layer, "proto")),
             } }),
             .vlan => try layers.addLayer(.{ .vlan = .{
                 .vlan = try Range(u12).parse(try getStringValue(layer, "vlan")),
-                .proto = try Eth.parseEthProto(try getOptionalStringValue(layer, "proto")),
+                .proto = try EthProto.init(try getOptionalStringValue(layer, "proto")),
             } }),
             .vxlan => try layers.addLayer(.{ .vxlan = .{
                 .vni = try Range(u24).parse(try getStringValue(layer, "vni")),
