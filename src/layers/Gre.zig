@@ -1,11 +1,11 @@
 const std = @import("std");
 
-const Eth = @import("Eth.zig");
+const EthProto = @import("../net/EthProto.zig");
 
 pub const Gre = @This();
 
 flags: u16 = 0,
-proto: u16 = Eth.unset,
+proto: EthProto,
 
 pub fn size(_: *const Gre) u16 {
     return 4;
@@ -13,13 +13,12 @@ pub fn size(_: *const Gre) u16 {
 
 pub inline fn write(self: *const Gre, writer: anytype, _: u64) !usize {
     try writer.writeInt(u16, self.flags, .big);
-    try writer.writeInt(u16, self.proto, .big);
+    try self.proto.write(writer);
     return self.size();
 }
 
 pub fn setNextProto(self: *Gre, next_proto: u16) !void {
-    if (self.proto != Eth.unset) return error.AlreadySet;
-    self.proto = next_proto;
+    return self.proto.set(next_proto);
 }
 
 pub fn getProto(_: *const Gre) ?u16 {
@@ -27,13 +26,5 @@ pub fn getProto(_: *const Gre) ?u16 {
 }
 
 pub fn format(self: *const Gre, writer: anytype) !void {
-    if (std.meta.intToEnum(Eth.ethProto, self.proto)) |proto| {
-        try writer.print("next_proto:{s}(0x{x:0>4})", .{
-            @tagName(proto), self.proto,
-        });
-    } else |_| {
-        try writer.print("next_proto:0x{x:0>4}", .{
-            self.proto,
-        });
-    }
+    try writer.print("next_proto:{f}", .{self.proto});
 }
