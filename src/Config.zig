@@ -6,13 +6,13 @@ const IpAddr = @import("net/IpAddr.zig");
 const Ipv6Addr = @import("net/Ipv6Addr.zig");
 const MacAddr = @import("net/MacAddr.zig");
 const EthProto = @import("net/EthProto.zig");
+const IpProto = @import("net/IpProto.zig");
 const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
 const SocketConfig = @import("Socket.zig").SocketConfig;
 const CliArgs = @import("CliArgs.zig");
 const pretty = @import("pretty.zig");
 
-const Ip = @import("layers/Ip.zig");
 const Layers = @import("layers/Layers.zig");
 const Layer = @import("layers/layer.zig").Layer;
 
@@ -86,7 +86,7 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .ip => try layers.addLayer(.{ .ip = .{
                 .saddr = try Range(IpAddr).parse(try getStringValue(layer, "src")),
                 .daddr = try Range(IpAddr).parse(try getStringValue(layer, "dst")),
-                .protocol = try Ip.parseIpProto(try getOptionalStringValue(layer, "proto")),
+                .protocol = try IpProto.init(try getOptionalStringValue(layer, "proto")),
             } }),
             .udp => try layers.addLayer(.{ .udp = .{
                 .source = try getIntRangeValue(u16, layer, "src"),
@@ -95,7 +95,7 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .ipv6 => try layers.addLayer(.{ .ipv6 = .{
                 .saddr = try Range(Ipv6Addr).parse(try getStringValue(layer, "src")),
                 .daddr = try Range(Ipv6Addr).parse(try getStringValue(layer, "dst")),
-                .next_header = try Ip.parseIpProto(try getOptionalStringValue(layer, "next_header")),
+                .next_header = try IpProto.init(try getOptionalStringValue(layer, "next_header")),
             } }),
         }
     }

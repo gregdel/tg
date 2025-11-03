@@ -108,6 +108,7 @@ test {
     _ = @import("layers/Ip.zig");
     _ = @import("net/EthProto.zig");
     _ = @import("net/IpAddr.zig");
+    _ = @import("net/IpProto.zig");
     _ = @import("net/Ipv6Addr.zig");
     _ = @import("net/checksum.zig");
     _ = @import("pretty.zig");
