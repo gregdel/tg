@@ -1,12 +1,11 @@
 const std = @import("std");
 
-const Ip = @import("../layers/Ip.zig");
 const checksum = @import("../net/checksum.zig");
 const IpProto = @import("../net/IpProto.zig");
 const Ipv6Addr = @import("../net/Ipv6Addr.zig");
 const Range = @import("../range.zig").Range;
 
-pub const Ipv6 = @This();
+const Ipv6 = @This();
 
 version: u4 = 6,
 ds: u6 = 0,

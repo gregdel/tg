@@ -5,10 +5,10 @@ const Config = @import("Config.zig");
 const CliArgs = @import("CliArgs.zig");
 const CmdCtx = @import("CliArgs.zig").CmdCtx;
 
-pub const max_layers = @import("layers/Layers.zig").max_layers;
+const max_layers = @import("layers/Layers.zig").max_layers;
 
 // Disable YAML parsing logs
-pub const std_options: std.Options = .{
+const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .parser, .level = .err },
         .{ .scope = .tokenizer, .level = .err },

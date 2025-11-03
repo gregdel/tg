@@ -12,7 +12,7 @@ pub fn size(_: *const Vlan) u16 {
     return 4;
 }
 
-pub inline fn write(self: *const Vlan, writer: anytype, seed: u64) !usize {
+pub fn write(self: *const Vlan, writer: anytype, seed: u64) !usize {
     const vlan = self.vlan.get(seed);
     try writer.writeInt(u16, vlan, .big);
     try self.proto.write(writer);

@@ -3,14 +3,14 @@ const std = @import("std");
 const checksum = @import("../net/checksum.zig");
 const PortRange = @import("../range.zig").Range(u16);
 
-pub const Udp = @This();
+const Udp = @This();
 
 source: PortRange,
 dest: PortRange,
 len: u16 = 0,
 check: u16 = 0,
 
-pub inline fn size(_: *const Udp) u16 {
+pub fn size(_: *const Udp) u16 {
     return 8;
 }
 
@@ -27,7 +27,7 @@ pub fn getProto(_: *const Udp) ?u16 {
     return std.os.linux.IPPROTO.UDP;
 }
 
-pub inline fn write(self: *const Udp, writer: anytype, seed: u64) !usize {
+pub fn write(self: *const Udp, writer: anytype, seed: u64) !usize {
     const source = self.source.get(seed);
     const dest = self.dest.get(seed);
 

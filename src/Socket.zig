@@ -61,7 +61,7 @@ pub const SocketConfig = struct {
     }
 };
 
-pub const Socket = @This();
+const Socket = @This();
 
 config: *const SocketConfig,
 stats: *Stats,
@@ -207,7 +207,7 @@ pub fn fill(self: *Socket, id_start: usize, pkt_count: usize, seed_start: u64) !
     }
 }
 
-pub inline fn wakeup(self: *Socket) !void {
+pub fn wakeup(self: *Socket) !void {
     if (xsk.xsk_ring_prod__needs_wakeup(@ptrCast(&self.tx)) == 0) {
         return;
     }
@@ -225,7 +225,7 @@ pub inline fn wakeup(self: *Socket) !void {
     }
 }
 
-pub inline fn checkCompleted(self: *Socket) !void {
+pub fn checkCompleted(self: *Socket) !void {
     if (self.stats.frames_pending == 0) return;
 
     var id: u32 = undefined;

@@ -3,7 +3,7 @@ const linux = std.os.linux;
 
 const EthProto = @This();
 
-pub const unset: u16 = 0xffff;
+const unset: u16 = 0xffff;
 
 proto: u16 = unset,
 

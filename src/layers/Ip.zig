@@ -5,7 +5,7 @@ const IpAddr = @import("../net/IpAddr.zig");
 const IpProto = @import("../net/IpProto.zig");
 const Range = @import("../range.zig").Range;
 
-pub const Ip = @This();
+const Ip = @This();
 
 version: u4 = 4,
 ihl: u4 = 5,

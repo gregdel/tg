@@ -9,7 +9,7 @@ pub fn size(_: *const Vxlan) u16 {
     return 8;
 }
 
-pub inline fn write(self: *const Vxlan, writer: anytype, seed: u64) !usize {
+pub fn write(self: *const Vxlan, writer: anytype, seed: u64) !usize {
     const vni: u32 = @shlExact(self.vni.get(seed), 8);
     try writer.writeInt(u32, self.flags, .big);
     try writer.writeInt(u32, vni, .big);

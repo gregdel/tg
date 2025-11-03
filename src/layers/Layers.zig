@@ -4,7 +4,7 @@ const Layer = @import("layer.zig").Layer;
 
 pub const max_layers = 12;
 
-pub const Layers = @This();
+const Layers = @This();
 
 entries: [max_layers]Layer = undefined,
 count: u8 = 0,

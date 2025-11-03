@@ -25,7 +25,7 @@ pub fn zero() MacAddr {
     return .{ .bytes = .{0} ** 6 };
 }
 
-pub inline fn write(self: *const MacAddr, writer: *std.Io.Writer) !usize {
+pub fn write(self: *const MacAddr, writer: *std.Io.Writer) !usize {
     return writer.write(&self.bytes);
 }
 
