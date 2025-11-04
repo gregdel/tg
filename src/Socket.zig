@@ -5,6 +5,7 @@ const pkt = @import("pkt.zig");
 const CpuSet = @import("CpuSet.zig");
 const Stats = @import("Stats.zig");
 const Layers = @import("layers/Layers.zig");
+const RateLimiter = @import("net/RateLimiter.zig");
 
 const xsk = @cImport({
     @cInclude("xdp/xsk.h");
@@ -32,6 +33,7 @@ pub const SocketConfig = struct {
     pkt_size: u16,
     frames_per_packet: u8,
     pkt_count: ?u64,
+    rate_limit_pps: ?u64,
     pkt_batch: u32,
     umem_entries: u32,
     pre_fill: bool,
@@ -55,8 +57,11 @@ pub const SocketConfig = struct {
         if (self.frames_per_packet > 1) {
             try writer.print("\n  Frames per packet:{d}", .{self.frames_per_packet});
         }
-        if (self.pkt_count != null) {
-            try writer.print("\n  Packet count:{d}", .{self.pkt_count.?});
+        if (self.pkt_count) |count| {
+            try writer.print("\n  Packet count:{d}", .{count});
+        }
+        if (self.rate_limit_pps) |pps| {
+            try writer.print("\n  Rate limit: {d} pps", .{pps});
         }
     }
 };
@@ -64,6 +69,7 @@ pub const SocketConfig = struct {
 const Socket = @This();
 
 config: *const SocketConfig,
+rate_limiter: ?RateLimiter = null,
 stats: *Stats,
 umem_area: []align(page_size) u8,
 cq: xsk.xsk_ring_cons,
@@ -148,7 +154,13 @@ pub fn init(config: *const SocketConfig, stats: *Stats) !Socket {
     const socket_fd = xsk.xsk_socket__fd(@ptrCast(socket));
     if (socket_fd < 0) return SocketError.SocketFD;
 
+    const rate_limiter: ?RateLimiter = if (config.rate_limit_pps) |pps|
+        try RateLimiter.init(pps)
+    else
+        null;
+
     return .{
+        .rate_limiter = rate_limiter,
         .config = config,
         .stats = stats,
         .umem_area = addr[0..size],
@@ -177,6 +189,12 @@ pub fn run(self: *Socket) !void {
             const remaining = limit - pkt_sent;
             if (remaining == 0) break;
             to_send = @min(self.config.pkt_batch, remaining);
+        }
+
+        if (self.rate_limiter) |*limiter| {
+            if (!limiter.tryTake(to_send)) {
+                continue;
+            }
         }
 
         try self.send(to_send, seed);
