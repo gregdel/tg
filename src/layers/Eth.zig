@@ -1,7 +1,7 @@
 const Eth = @This();
 
 const MacAddr = @import("../net/MacAddr.zig");
-const EthProto = @import("../net/EthProto.zig");
+const EthProto = @import("../net/proto.zig").Eth;
 const Range = @import("../range.zig").Range;
 
 src: Range(MacAddr),
