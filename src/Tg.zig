@@ -43,19 +43,15 @@ pub fn threadRun(ctx: *ThreadContext) !void {
     try socket.updateXskStats();
 }
 
-pub fn thread_pkt_count(self: *const Tg, thread: usize) ?u64 {
-    return pkt_count(
-        self.config.socket_config.pkt_count,
-        self.config.threads,
-        thread,
-    );
+pub fn distributeToThread(self: *const Tg, total: ?u64, thread_idx: usize) ?u64 {
+    return distributeWork(total, self.config.threads, thread_idx);
 }
 
-pub fn pkt_count(count: ?u64, threads: u32, thread: usize) ?u64 {
-    const total = count orelse return null;
-    const per_thread = total / threads;
-    const remaining = total % threads;
-    return if (thread < remaining) per_thread + 1 else per_thread;
+pub fn distributeWork(total: ?u64, thread_count: u32, thread_idx: usize) ?u64 {
+    const count = total orelse return null;
+    const per_thread = count / thread_count;
+    const remaining = count % thread_count;
+    return if (thread_idx < remaining) per_thread + 1 else per_thread;
 }
 
 pub fn run(self: *Tg) !void {
@@ -73,7 +69,22 @@ pub fn run(self: *Tg) !void {
         var ctx = &threads_ctx[queue_id];
         ctx.config.queue_id = @truncate(queue_id);
         ctx.config.affinity = self.config.device_info.queues[queue_id] orelse CpuSet.zero();
-        ctx.config.pkt_count = self.thread_pkt_count(queue_id);
+        ctx.config.pkt_count = self.distributeToThread(default_config.pkt_count, queue_id);
+        if (default_config.rate_limit_pps) |pps| {
+            ctx.config.rate_limit_pps = self.distributeToThread(pps, queue_id);
+            if (ctx.config.rate_limit_pps == 0) {
+                std.log.debug("No work to do on thread {d}", .{queue_id});
+                continue;
+            }
+
+            if (pps < ctx.config.pkt_batch) {
+                std.log.debug("Adjusting batch_size of thread {d} to {d}", .{
+                    queue_id,
+                    pps,
+                });
+                ctx.config.pkt_batch = @truncate(pps);
+            }
+        }
 
         threads[queue_id] = try std.Thread.spawn(.{}, Tg.threadRun, .{ctx});
         const name = try std.fmt.bufPrint(&buf, "tg_q_{d}", .{queue_id});
@@ -82,6 +93,7 @@ pub fn run(self: *Tg) !void {
         queues += 1;
     }
 
+    std.log.debug("Waiting for {d} threads", .{queues});
     for (0..queues) |queue| {
         threads[queue].join();
         self.stats.add(&threads_ctx[queue].stats);
@@ -113,10 +125,10 @@ pub fn format(self: *const Tg, writer: anytype) !void {
     );
 }
 
-test "pkt_count" {
+test "distributeWork" {
     // 10 packets total on 5 threads -> 2 per thread
     inline for (0..5) |thread| {
-        try std.testing.expectEqual(2, pkt_count(10, 5, thread));
+        try std.testing.expectEqual(2, distributeWork(10, 5, thread));
     }
 
     // 6 packets total on 4 threads:
@@ -124,11 +136,11 @@ test "pkt_count" {
     // Thread 1 -> 2
     // Thread 2 -> 1
     // Thread 3 -> 1
-    try std.testing.expectEqual(2, pkt_count(6, 4, 0));
-    try std.testing.expectEqual(2, pkt_count(6, 4, 1));
-    try std.testing.expectEqual(1, pkt_count(6, 4, 2));
-    try std.testing.expectEqual(1, pkt_count(6, 4, 3));
+    try std.testing.expectEqual(2, distributeWork(6, 4, 0));
+    try std.testing.expectEqual(2, distributeWork(6, 4, 1));
+    try std.testing.expectEqual(1, distributeWork(6, 4, 2));
+    try std.testing.expectEqual(1, distributeWork(6, 4, 3));
 
     // No limit
-    try std.testing.expectEqual(null, pkt_count(null, 1, 0));
+    try std.testing.expectEqual(null, distributeWork(null, 1, 0));
 }

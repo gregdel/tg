@@ -137,6 +137,7 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .umem_entries = umem_entries,
             .frames_per_packet = frames_per_packet,
             .pre_fill = try getValue(?bool, map, "pre_fill") orelse false,
+            .rate_limit_pps = try getValue(?u64, map, "pps"),
             .pkt_count = pkt_count,
             .pkt_batch = batch,
             .layers = layers,
