@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const EthProto = @import("../net/EthProto.zig");
+const EthProto = @import("../net/proto.zig").Eth;
 
 const Gre = @This();
 

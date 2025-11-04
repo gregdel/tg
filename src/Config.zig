@@ -2,11 +2,11 @@ const std = @import("std");
 
 const Yaml = @import("yaml").Yaml;
 
+const EthProto = @import("net/proto.zig").Eth;
 const IpAddr = @import("net/IpAddr.zig");
+const IpProto = @import("net/proto.zig").Ip;
 const Ipv6Addr = @import("net/Ipv6Addr.zig");
 const MacAddr = @import("net/MacAddr.zig");
-const EthProto = @import("net/EthProto.zig");
-const IpProto = @import("net/IpProto.zig");
 const Range = @import("range.zig").Range;
 const DeviceInfo = @import("DeviceInfo.zig");
 const SocketConfig = @import("Socket.zig").SocketConfig;

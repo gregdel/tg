@@ -8,7 +8,7 @@ const CmdCtx = @import("CliArgs.zig").CmdCtx;
 const max_layers = @import("layers/Layers.zig").max_layers;
 
 // Disable YAML parsing logs
-const std_options: std.Options = .{
+pub const std_options: std.Options = .{
     .log_scope_levels = &[_]std.log.ScopeLevel{
         .{ .scope = .parser, .level = .err },
         .{ .scope = .tokenizer, .level = .err },
@@ -106,9 +106,8 @@ test {
     _ = @import("DeviceInfo.zig");
     _ = @import("Tg.zig");
     _ = @import("layers/Ip.zig");
-    _ = @import("net/EthProto.zig");
     _ = @import("net/IpAddr.zig");
-    _ = @import("net/IpProto.zig");
+    _ = @import("net/proto.zig");
     _ = @import("net/Ipv6Addr.zig");
     _ = @import("net/checksum.zig");
     _ = @import("pretty.zig");

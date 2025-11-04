@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const checksum = @import("../net/checksum.zig");
-const IpProto = @import("../net/IpProto.zig");
+const IpProto = @import("../net/proto.zig").Ip;
 const Ipv6Addr = @import("../net/Ipv6Addr.zig");
 const Range = @import("../range.zig").Range;
 
@@ -45,7 +45,7 @@ pub fn pseudoHeaderCksum(self: *const Ipv6, data: []const u8) !u16 {
     @memcpy(pseudo_header[0..16], header[8..24]);
     @memcpy(pseudo_header[16..32], header[24..40]);
     std.mem.writeInt(u32, pseudo_header[32..36], self.payload_len, .big);
-    pseudo_header[36..40].* = .{ 0, 0, 0, self.next_header.proto };
+    pseudo_header[36..40].* = .{ 0, 0, 0, self.next_header.asInt() };
     return checksum.cksum(&pseudo_header, 0);
 }
 

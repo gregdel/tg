@@ -3,7 +3,7 @@ const std = @import("std");
 const Vlan = @This();
 
 const Range = @import("../range.zig").Range;
-const EthProto = @import("../net/EthProto.zig");
+const EthProto = @import("../net/proto.zig").Eth;
 
 vlan: Range(u12),
 proto: EthProto,
