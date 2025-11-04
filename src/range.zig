@@ -1,9 +1,5 @@
 const std = @import("std");
 
-const MacAddr = @import("net/MacAddr.zig");
-const IpAddr = @import("net/IpAddr.zig");
-const Ipv6Addr = @import("net/Ipv6Addr.zig");
-
 const RangeError = error{
     EndBeforeStart,
     ParseError,
@@ -38,24 +34,14 @@ pub fn Range(comptime T: type) type {
         pub fn fromInt(value: u64) T {
             return switch (@typeInfo(T)) {
                 .int => @truncate(value),
-                else => switch (T) {
-                    MacAddr => MacAddr.fromInt(value),
-                    IpAddr => IpAddr.fromInt(value),
-                    Ipv6Addr => Ipv6Addr.fromInt(value),
-                    else => @compileError("Unsupported type:" ++ @typeName(T)),
-                },
+                inline else => T.fromInt(value),
             };
         }
 
         pub fn toInt(value: T) u64 {
             return switch (@typeInfo(T)) {
                 .int => @intCast(value),
-                else => switch (T) {
-                    MacAddr => value.toInt(),
-                    IpAddr => value.toInt(),
-                    Ipv6Addr => value.toInt(),
-                    else => @compileError("Unsupported type:" ++ @typeName(T)),
-                },
+                inline else => value.toInt(),
             };
         }
 
@@ -69,12 +55,7 @@ pub fn Range(comptime T: type) type {
                 if (i == 2) return error.ParseError;
                 const value = switch (@typeInfo(T)) {
                     .int => std.fmt.parseInt(T, part, 10),
-                    else => switch (T) {
-                        MacAddr => MacAddr.parse(part),
-                        IpAddr => IpAddr.parse(part),
-                        Ipv6Addr => Ipv6Addr.parse(part),
-                        else => @compileError("Unsupported type:" ++ @typeName(T)),
-                    },
+                    inline else => T.parse(part),
                 };
 
                 if (value) |v| {
@@ -116,6 +97,7 @@ test "range end greater than start" {
 }
 
 test "range of MacAddr" {
+    const MacAddr = @import("net/MacAddr.zig");
     const macaddr_range = try Range(MacAddr).init(
         try MacAddr.parse("de:ad:be:ef:00:00"),
         try MacAddr.parse("de:ad:be:ef:00:ff"),
@@ -126,6 +108,7 @@ test "range of MacAddr" {
 }
 
 test "parse range of MacAddr" {
+    const MacAddr = @import("net/MacAddr.zig");
     const expected = try Range(MacAddr).init(
         try MacAddr.parse("de:ad:be:ef:00:00"),
         try MacAddr.parse("de:ad:be:ef:00:ff"),
@@ -161,6 +144,7 @@ test "parse invalid range" {
 }
 
 test "range of ip" {
+    const IpAddr = @import("net/IpAddr.zig");
     const ipaddr_range = try Range(IpAddr).init(
         try IpAddr.parse("192.168.1.0"),
         try IpAddr.parse("192.168.1.255"),
@@ -171,6 +155,7 @@ test "range of ip" {
 }
 
 test "parse range of ipv6" {
+    const Ipv6Addr = @import("net/Ipv6Addr.zig");
     const ipv6_range = try Range(Ipv6Addr).parse("2001::-2002::");
     const expected_range = try Range(Ipv6Addr).init(
         try Ipv6Addr.parse("2001::"),
@@ -180,6 +165,7 @@ test "parse range of ipv6" {
 }
 
 test "range of ipv6" {
+    const Ipv6Addr = @import("net/Ipv6Addr.zig");
     const range = try Range(Ipv6Addr).init(
         try Ipv6Addr.parse("2001::"),
         try Ipv6Addr.parse("2002::"),
