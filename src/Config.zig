@@ -116,15 +116,24 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     // Batches should not be smaller than the number of umem entries
     batch = @min(batch, umem_entries);
 
-    const pkt_count = try getValue(?u64, map, "count");
+    const pkt_count = if (cli_args.count) |count| count else try getValue(?u64, map, "count");
 
     // The number of threads might be limited by the number of queues
-    var threads = try getValue(?u32, map, "threads") orelse device_info.queue_count;
+    var threads = if (cli_args.threads) |threads|
+        threads
+    else
+        try getValue(?u32, map, "threads") orelse device_info.queue_count;
     threads = @min(threads, device_info.queue_count);
     if (pkt_count) |count| {
         // Don't use more threads than packets to send
         threads = @min(threads, count);
     }
+
+    const rate_limit_pps = if (cli_args.pps) |pps| pps else try getValue(?u64, map, "pps");
+    const prefill = if (cli_args.prefill) |pre_fill|
+        pre_fill
+    else
+        try getValue(?bool, map, "pre_fill") orelse false;
 
     return .{
         .allocator = allocator,
@@ -136,8 +145,8 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .pkt_size = pkt_size,
             .umem_entries = umem_entries,
             .frames_per_packet = frames_per_packet,
-            .pre_fill = try getValue(?bool, map, "pre_fill") orelse false,
-            .rate_limit_pps = try getValue(?u64, map, "pps"),
+            .prefill = prefill,
+            .rate_limit_pps = rate_limit_pps,
             .pkt_count = pkt_count,
             .pkt_batch = batch,
             .layers = layers,

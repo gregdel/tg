@@ -36,19 +36,19 @@ pub const SocketConfig = struct {
     rate_limit_pps: ?u64,
     pkt_batch: u32,
     umem_entries: u32,
-    pre_fill: bool,
+    prefill: bool,
 
     pub fn format(self: *const SocketConfig, writer: anytype) !void {
         try writer.print(
             \\Socket config:
             \\  Ring size:{d}
-            \\  UMEM entries:{d} pre-fill:{}
+            \\  UMEM entries:{d} prefill:{}
             \\  Packet batch:{d} size:{d}
         ,
             .{
                 ring_size,
                 self.umem_entries,
-                self.pre_fill,
+                self.prefill,
                 self.pkt_batch,
                 self.pkt_size,
             },
@@ -181,7 +181,7 @@ fn umemAddr(self: *Socket, id: usize) usize {
 
 pub fn run(self: *Socket) !void {
     var seed: u64 = 0;
-    if (self.config.pre_fill) try self.fillAll();
+    if (self.config.prefill) try self.fillAll();
     while (signal.running.load(.acquire)) {
         var to_send: u32 = self.config.pkt_batch;
         if (self.config.pkt_count) |limit| {
@@ -271,7 +271,7 @@ pub fn send(self: *Socket, pkt_count: u32, seed_start: u64) !void {
     );
     if (reserved != frames) return; // TODO
 
-    if (!self.config.pre_fill) {
+    if (!self.config.prefill) {
         try self.fill(id, pkt_count, seed_start);
     }
 

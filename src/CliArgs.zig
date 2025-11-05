@@ -1,16 +1,26 @@
 const std = @import("std");
 
+const pretty = @import("pretty.zig");
+
 const CliArgs = @This();
 
 dev: ?[]const u8 = null,
 config: ?[]const u8 = null,
 prog: ?[]const u8 = null,
+threads: ?u32 = null,
+pps: ?u64 = null,
+count: ?u64 = null,
+prefill: ?bool = null,
 
 const ArgType = enum {
     help,
     dev,
     config,
     prog,
+    threads,
+    pps,
+    count,
+    prefill,
 };
 
 pub const usage =
@@ -18,12 +28,16 @@ pub const usage =
     \\  tg [command] [args]
     \\Commands:
     \\  help
-    \\  send [dev DEV] [config PATH]
+    \\  send [dev DEV] [config PATH] [pps PPS] [count COUNT]
+    \\       [threads THREADS] [prefill]
     \\  attach dev DEV prog [tg_drop|tg_pass]
     \\  detach dev DEV
     \\Arguments:
-    \\  DEV    device to use
-    \\  PATH   config file path
+    \\  DEV      device to use
+    \\  PATH     config file path
+    \\  PPS      number of packet per second (e.g 1k)
+    \\  COUNT    total number of packets to send (e.g 1M)
+    \\  prefill  prefill the umem with packets only once
 ;
 const Cmd = enum {
     help,
@@ -36,6 +50,10 @@ const Cmd = enum {
             .send => std.StaticStringMap(ArgType).initComptime(.{
                 .{ "dev", .dev },
                 .{ "config", .config },
+                .{ "pps", .pps },
+                .{ "count", .count },
+                .{ "threads", .threads },
+                .{ "prefill", .prefill },
                 .{ "help", .help },
             }),
             .attach => std.StaticStringMap(ArgType).initComptime(.{
@@ -62,6 +80,10 @@ pub const CliCmd = struct {
     args: CliArgs = .{},
 };
 
+pub fn getNext(args: *std.process.ArgIterator) ![:0]const u8 {
+    return args.next() orelse return error.CliUsage;
+}
+
 pub fn parse(commands: std.StaticStringMap(CmdCtx)) !CliCmd {
     var args = std.process.args();
     _ = args.skip();
@@ -87,13 +109,25 @@ pub fn parse(commands: std.StaticStringMap(CmdCtx)) !CliCmd {
 
         switch (arg_type) {
             .dev => {
-                cmd.args.dev = args.next() orelse return error.CliUsage;
+                cmd.args.dev = try getNext(&args);
             },
             .config => {
-                cmd.args.config = args.next() orelse return error.CliUsage;
+                cmd.args.config = try getNext(&args);
             },
             .prog => {
-                cmd.args.prog = args.next() orelse return error.CliUsage;
+                cmd.args.prog = try getNext(&args);
+            },
+            .pps => {
+                cmd.args.pps = try pretty.parseNumber(u64, try getNext(&args));
+            },
+            .count => {
+                cmd.args.count = try pretty.parseNumber(u64, try getNext(&args));
+            },
+            .threads => {
+                cmd.args.threads = try pretty.parseNumber(u32, try getNext(&args));
+            },
+            .prefill => {
+                cmd.args.prefill = true;
             },
             .help => {
                 return error.CliUsage;
