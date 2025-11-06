@@ -10,6 +10,7 @@ const CliArgs = @import("CliArgs.zig");
 const bpf = @import("bpf.zig");
 
 const max_queues = @import("DeviceInfo.zig").max_queues;
+const alignement = @import("CpuSet.zig").alignement;
 
 const ThreadContext = struct {
     stats: Stats,
@@ -25,12 +26,14 @@ const ThreadContext = struct {
 
 const Tg = @This();
 
+allocator: std.mem.Allocator,
 config: *const Config,
 stats: Stats = .{},
 
-pub fn init(config: *const Config) !Tg {
+pub fn init(allocator: std.mem.Allocator, config: *const Config) !Tg {
     return .{
         .config = config,
+        .allocator = allocator,
     };
 }
 
@@ -55,48 +58,57 @@ pub fn distributeWork(total: ?u64, thread_count: u32, thread_idx: usize) ?u64 {
 }
 
 pub fn run(self: *Tg) !void {
-    // TODO: cache align ?
-    var threads: [max_queues]std.Thread = undefined;
-    var threads_ctx: [max_queues]ThreadContext = undefined;
+    const thread_count = self.config.threads;
+
+    var threads = try std.ArrayList(std.Thread)
+        .initCapacity(self.allocator, thread_count);
+    defer threads.deinit(self.allocator);
+
+    var threads_ctx = try std.ArrayListAligned(ThreadContext, alignement)
+        .initCapacity(self.allocator, thread_count);
+    defer threads_ctx.deinit(self.allocator);
 
     try signal.setup();
-    var queues: usize = 0;
-    var buf: [16]u8 = undefined;
-    const default_config = self.config.socket_config;
-    for (0..self.config.threads) |queue_id| {
-        threads_ctx[queue_id] = ThreadContext.init(default_config);
 
-        var ctx = &threads_ctx[queue_id];
-        ctx.config.queue_id = @truncate(queue_id);
-        ctx.config.affinity = self.config.device_info.queues[queue_id] orelse CpuSet.zero();
-        ctx.config.pkt_count = self.distributeToThread(default_config.pkt_count, queue_id);
+    const default_config = self.config.socket_config;
+    for (0..thread_count) |i| {
+        try threads_ctx.append(
+            self.allocator,
+            ThreadContext.init(default_config),
+        );
+
+        var ctx = &threads_ctx.items[i];
+        ctx.config.queue_id = @truncate(i);
+        ctx.config.affinity = self.config.device_info.queues[i] orelse CpuSet.zero();
+        ctx.config.pkt_count = self.distributeToThread(default_config.pkt_count, i);
         if (default_config.rate_limit_pps) |pps| {
-            ctx.config.rate_limit_pps = self.distributeToThread(pps, queue_id);
+            ctx.config.rate_limit_pps = self.distributeToThread(pps, i);
             if (ctx.config.rate_limit_pps == 0) {
-                std.log.debug("No work to do on thread {d}", .{queue_id});
+                std.log.debug("No work to do on thread {d}", .{i});
                 continue;
             }
 
             if (pps < ctx.config.pkt_batch) {
                 std.log.debug("Adjusting batch_size of thread {d} to {d}", .{
-                    queue_id,
+                    i,
                     pps,
                 });
                 ctx.config.pkt_batch = @truncate(pps);
             }
         }
 
-        threads[queue_id] = try std.Thread.spawn(.{}, Tg.threadRun, .{ctx});
-        const name = try std.fmt.bufPrint(&buf, "tg_q_{d}", .{queue_id});
-        try threads[queue_id].setName(name);
+        const thread = try std.Thread.spawn(.{}, Tg.threadRun, .{ctx});
+        var buf: [16]u8 = undefined;
+        const name = try std.fmt.bufPrint(&buf, "tg_q_{d}", .{i});
+        try thread.setName(name);
 
-        queues += 1;
+        try threads.append(self.allocator, thread);
     }
 
-    std.log.debug("Waiting for {d} threads", .{queues});
-    for (0..queues) |queue| {
-        threads[queue].join();
-        self.stats.add(&threads_ctx[queue].stats);
+    std.log.debug("Waiting for {d} threads", .{threads.items.len});
+    for (threads.items, 0..) |thread, i| {
+        thread.join();
+        self.stats.add(&threads_ctx.items[i].stats);
     }
 }
 

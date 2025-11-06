@@ -1,5 +1,7 @@
 const std = @import("std");
 
+pub const alignement: std.mem.Alignment = .@"64";
+
 const CpuSet = @This();
 
 value: std.os.linux.cpu_set_t,

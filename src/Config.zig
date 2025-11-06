@@ -59,7 +59,8 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     const layers_raw = map.get("layers") orelse return error.ConfigMissingLayers;
     const layer_list = layers_raw.asList() orelse return error.ConfigMissingLayers;
 
-    var layers = Layers{};
+    var layers = try Layers.init(allocator, layer_list.len);
+    errdefer layers.deinit();
     for (layer_list) |layer_value| {
         const layer = layer_value.asMap() orelse return error.InvalidYaml;
         const layer_type = std.meta.stringToEnum(
@@ -159,8 +160,9 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     };
 }
 
-pub fn deinit(self: *const Config) void {
+pub fn deinit(self: *Config) void {
     self.allocator.free(self.socket_config.dev);
+    self.socket_config.layers.deinit();
 }
 
 pub fn format(self: *const Config, writer: anytype) !void {
@@ -257,7 +259,7 @@ test "parse yaml" {
     try std.testing.expectEqual(1500, config.socket_config.pkt_size);
     try std.testing.expectEqual(256, config.socket_config.pkt_batch);
     try std.testing.expectEqual(1024, config.socket_config.pkt_count);
-    try std.testing.expectEqual(3, config.layers.count);
+    try std.testing.expectEqual(3, config.layers.entries.items.len);
 }
 
 test "parse yaml optional" {
