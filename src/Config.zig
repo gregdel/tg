@@ -100,7 +100,12 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
         }
     }
 
-    const pkt_size = try getValue(?u16, map, "pkt_size") orelse layers.minSize();
+    const pkt_min_size = layers.minSize();
+    var pkt_size = try getValue(?u16, map, "pkt_size") orelse pkt_min_size;
+    if (pkt_size < pkt_min_size) {
+        pkt_size = pkt_min_size;
+        std.log.debug("Adjusting packet size to fit the layers: {d}", .{pkt_size});
+    }
     layers.fixSize(pkt_size);
     try layers.fixMissingNextHeader();
 
