@@ -52,12 +52,12 @@ fn send(cli_args: *const CliArgs) !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const config = try Config.init(allocator, cli_args);
+    var config = try Config.init(allocator, cli_args);
     defer config.deinit();
     try stdout.print("{f}", .{config});
     try stdout.flush();
 
-    var tg = try Tg.init(&config);
+    var tg = try Tg.init(allocator, &config);
     try tg.run();
 
     try stdout.print("\n{f}", .{tg});

@@ -102,8 +102,6 @@ pub const Capabilities = struct {
     }
 
     pub fn init(index: u32) !Capabilities {
-        std.log.debug("index:{d}", .{index});
-
         var opts = bpf_xdp_query_opts.init();
         const ret = bpf.bpf_xdp_query(@intCast(index), linux.XDP_FLAGS_DRV_MODE, @ptrCast(&opts));
         if (ret < 0) {
