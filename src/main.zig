@@ -68,17 +68,18 @@ fn help(_: *const CliArgs) !void {}
 
 fn exitError(err: anyerror) !void {
     var stderr_buffer: [1024]u8 = undefined;
-    var stderr_writer = std.fs.File.stdout().writer(&stderr_buffer);
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+
     const stderr = &stderr_writer.interface;
 
-    const msg: ?[]const u8 = sw: switch (err) {
+    const msg: []const u8 = switch (err) {
         error.FileNotFound => "Config file not found",
         error.DeviceNotFound => "Network device not found",
         error.DeviceParse => "Failed to get device info",
         error.DeviceMacAddrParse => "Failed to parse device macaddr",
         error.InvalidYaml => "Invalid yaml configuration file",
         error.TooManyLayers => std.fmt.comptimePrint(
-            "To many layers, max: {d}",
+            "Too many layers, max: {d}",
             .{max_layers},
         ),
         error.MissingConfigFile => "Missing config file",
@@ -88,13 +89,11 @@ fn exitError(err: anyerror) !void {
         error.CliUsage => @import("CliArgs.zig").usage,
         else => {
             try stderr.print("Err: {t}\n", .{err});
-            break :sw null;
+            return std.posix.exit(1);
         },
     };
-    if (msg) |m| {
-        try stderr.writeAll(m);
-        try stderr.writeAll("\n");
-    }
+    try stderr.writeAll(msg);
+    try stderr.writeAll("\n");
 
     try stderr.flush();
     return std.posix.exit(1);
