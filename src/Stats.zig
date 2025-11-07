@@ -16,7 +16,7 @@ pub fn add(self: *Stats, other: *const Stats) void {
 
 pub fn format(self: *const Stats, writer: anytype) !void {
     try writer.print(
-        \\  Frames pending:{d} sent{d}
+        \\  Frames pending:{d} sent:{d}
         \\  Tx desc_invalid:{d} ring_empty:{d}
     , .{
         self.frames_pending,   self.frames_sent,
