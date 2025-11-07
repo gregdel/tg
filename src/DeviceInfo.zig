@@ -20,14 +20,13 @@ capabilities: Capabilities,
 const sysfs_path = "/sys/class/net/{s}";
 
 pub fn init(name: []const u8) !DeviceInfo {
-    var info: DeviceInfo = undefined;
-    if (parseFiles(name)) |value| {
-        info = value;
-    } else |err| return switch (err) {
-        error.FileNotFound => error.DeviceNotFound,
-        error.Overflow, error.InvalidCharacter => error.DeviceParse,
-        MacAddr.ParseError => error.DeviceMacAddrParse,
-        else => err,
+    var info = parseFiles(name) catch |err| {
+        return switch (err) {
+            error.FileNotFound => error.DeviceNotFound,
+            error.Overflow, error.InvalidCharacter => error.DeviceParse,
+            MacAddr.ParseError => error.DeviceMacAddrParse,
+            else => err,
+        };
     };
 
     try info.parseQueues();

@@ -109,11 +109,11 @@ pub fn init(config: *const SocketConfig, stats: *Stats) !Socket {
         .frame_headroom = 0,
     };
 
-    var fq: xsk.xsk_ring_prod = undefined;
-    var cq: xsk.xsk_ring_cons = undefined;
-    var umem: *xsk.xsk_umem = undefined;
-    var socket: *xsk.xsk_socket = undefined;
-    var tx: xsk.xsk_ring_prod = undefined;
+    var fq: xsk.xsk_ring_prod = .{};
+    var cq: xsk.xsk_ring_cons = .{};
+    var umem: ?*xsk.xsk_umem = null;
+    var socket: ?*xsk.xsk_socket = null;
+    var tx: xsk.xsk_ring_prod = .{};
 
     // TODO use create opts
     var ret = xsk.xsk_umem__create(
@@ -246,7 +246,7 @@ pub fn wakeup(self: *Socket) !void {
 pub fn checkCompleted(self: *Socket) !void {
     if (self.stats.frames_pending == 0) return;
 
-    var id: u32 = undefined;
+    var id: u32 = 0;
     const frames = xsk.xsk_ring_cons__peek(
         @ptrCast(&self.cq),
         self.stats.frames_pending,
@@ -300,7 +300,7 @@ pub fn send(self: *Socket, pkt_count: u32, seed_start: u64) !void {
 }
 
 pub fn updateXskStats(self: *Socket) !void {
-    var stats: xdp.xdp_statistics = undefined;
+    var stats: xdp.xdp_statistics = .{};
     try std.posix.getsockopt(
         self.fd,
         std.os.linux.SOL.XDP,
