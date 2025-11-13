@@ -89,6 +89,7 @@ fn exitError(err: anyerror) !void {
         error.CliUsage => @import("CliArgs.zig").usage,
         else => {
             try stderr.print("Err: {t}\n", .{err});
+            try stderr.flush();
             return std.posix.exit(1);
         },
     };
