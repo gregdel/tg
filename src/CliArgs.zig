@@ -9,6 +9,7 @@ config: ?[]const u8 = null,
 prog: ?[]const u8 = null,
 threads: ?u32 = null,
 pps: ?u64 = null,
+rate: ?u64 = null,
 count: ?u64 = null,
 prefill: ?bool = null,
 
@@ -19,6 +20,7 @@ const ArgType = enum {
     prog,
     threads,
     pps,
+    rate,
     count,
     prefill,
 };
@@ -28,7 +30,7 @@ pub const usage =
     \\  tg [command] [args]
     \\Commands:
     \\  help
-    \\  send [dev DEV] [config PATH] [pps PPS] [count COUNT]
+    \\  send [dev DEV] [config PATH] [pps PPS] [rate RATE] [count COUNT]
     \\       [threads THREADS] [prefill]
     \\  attach dev DEV prog [tg_drop|tg_pass]
     \\  detach dev DEV
@@ -36,6 +38,7 @@ pub const usage =
     \\  DEV      device to use
     \\  PATH     config file path
     \\  PPS      number of packet per second (e.g 1k)
+    \\  RATE     number of bits per second (e.g 1M)
     \\  COUNT    total number of packets to send (e.g 1M)
     \\  prefill  prefill the umem with packets only once
 ;
@@ -51,6 +54,7 @@ const Cmd = enum {
                 .{ "dev", .dev },
                 .{ "config", .config },
                 .{ "pps", .pps },
+                .{ "rate", .rate },
                 .{ "count", .count },
                 .{ "threads", .threads },
                 .{ "prefill", .prefill },
@@ -119,6 +123,9 @@ pub fn parse(commands: std.StaticStringMap(CmdCtx)) !CliCmd {
             },
             .pps => {
                 cmd.args.pps = try pretty.parseNumber(u64, try getNext(&args));
+            },
+            .rate => {
+                cmd.args.rate = try pretty.parseNumber(u64, try getNext(&args));
             },
             .count => {
                 cmd.args.count = try pretty.parseNumber(u64, try getNext(&args));

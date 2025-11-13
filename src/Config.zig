@@ -135,7 +135,13 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
         threads = @min(threads, count);
     }
 
+    const rate_limit = if (cli_args.rate) |rate| rate else try getValue(?u64, map, "rate");
     const rate_limit_pps = if (cli_args.pps) |pps| pps else try getValue(?u64, map, "pps");
+
+    if (rate_limit_pps != null and rate_limit != null) {
+        return error.PPSAndRate;
+    }
+
     const prefill = if (cli_args.prefill) |pre_fill|
         pre_fill
     else
@@ -152,7 +158,12 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
             .umem_entries = umem_entries,
             .frames_per_packet = frames_per_packet,
             .prefill = prefill,
-            .rate_limit_pps = rate_limit_pps,
+            .rate_limit_pps = if (rate_limit_pps) |pps|
+                pps
+            else if (rate_limit) |rate|
+                rate / (pkt_size * 8)
+            else
+                null,
             .pkt_count = pkt_count,
             .pkt_batch = batch,
             .layers = layers,
@@ -238,6 +249,7 @@ test "parse yaml" {
         \\pkt_size: 1500
         \\batch: 256
         \\count: 1024
+        \\rate: 12k
         \\layers:
         \\  - type: eth
         \\    src: de:ad:be:ef:00:00
@@ -259,6 +271,7 @@ test "parse yaml" {
     try std.testing.expectEqual(1500, config.socket_config.pkt_size);
     try std.testing.expectEqual(256, config.socket_config.pkt_batch);
     try std.testing.expectEqual(1024, config.socket_config.pkt_count);
+    try std.testing.expectEqual(1, config.socket_config.rate_limit_pps);
     try std.testing.expectEqual(3, config.layers.entries.items.len);
 }
 
