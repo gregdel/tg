@@ -290,3 +290,57 @@ test "parse yaml optional" {
     try std.testing.expectEqual(config.layers.minSize(), config.socket_config.pkt_size);
     try std.testing.expectEqual(default_batch, config.socket_config.pkt_batch);
 }
+
+test "cli supersede yaml" {
+    const source =
+        \\dev: tg0
+        \\pps: 2k
+        \\layers:
+        \\  - type: eth
+        \\    src: de:ad:be:ef:00:00
+        \\    dst: de:ad:be:ef:00:01
+        \\    proto: ip
+    ;
+    const cli_args: CliArgs = .{
+        .pps = 42,
+    };
+    var config = try initRaw(std.testing.allocator, &cli_args, source, false);
+    defer config.deinit();
+
+    try std.testing.expectEqual(42, config.socket_config.rate_limit_pps);
+}
+
+test "parse yaml error Missing dev" {
+    const source =
+        \\layers:
+        \\  - type: eth
+        \\    src: de:ad:be:ef:00:00
+        \\    dst: de:ad:be:ef:00:01
+        \\    proto: ip
+    ;
+    const cli_args: CliArgs = .{};
+    try std.testing.expectError(error.ConfigMissingDev, initRaw(std.testing.allocator, &cli_args, source, false));
+}
+
+test "parse yaml error Missing layers" {
+    const source =
+        \\dev: tg0
+    ;
+    const cli_args: CliArgs = .{};
+    try std.testing.expectError(error.ConfigMissingLayers, initRaw(std.testing.allocator, &cli_args, source, false));
+}
+
+test "parse yaml error Rate and PPS" {
+    const source =
+        \\dev: tg0
+        \\rate: 1k
+        \\pps: 2k
+        \\layers:
+        \\  - type: eth
+        \\    src: de:ad:be:ef:00:00
+        \\    dst: de:ad:be:ef:00:01
+        \\    proto: ip
+    ;
+    const cli_args: CliArgs = .{};
+    try std.testing.expectError(error.PPSAndRate, initRaw(std.testing.allocator, &cli_args, source, false));
+}
