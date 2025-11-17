@@ -115,10 +115,9 @@ fn initRaw(allocator: std.mem.Allocator, cli_args: *const CliArgs, source: []con
     // Adjust the umem entries to be a multiple of frames_per_packet
     var umem_entries: u32 = try getValue(?u32, map, "umem_entries") orelse default_umem_entries;
     umem_entries -= umem_entries % frames_per_packet;
+    if (umem_entries < frames_per_packet) umem_entries = frames_per_packet;
 
     var batch = try getValue(?u16, map, "batch") orelse default_batch;
-    // Adjust the batch size to be a multiple of frames_per_packet
-    batch -= batch % frames_per_packet;
     // Batches should not be smaller than the number of umem entries
     batch = @min(batch, umem_entries);
 
