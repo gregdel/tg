@@ -109,8 +109,8 @@ pub const Capabilities = struct {
         }
 
         return .{
-            .multi_buffer = opts.feature_flags & linux.NETDEV_XDP_ACT_NDO_XMIT_SG == 0,
-            .zerocopy = opts.feature_flags & linux.NETDEV_XDP_ACT_XSK_ZEROCOPY == 0,
+            .multi_buffer = opts.feature_flags & linux.NETDEV_XDP_ACT_NDO_XMIT_SG != 0,
+            .zerocopy = opts.feature_flags & linux.NETDEV_XDP_ACT_XSK_ZEROCOPY != 0,
             .zerocopy_max_frames = opts.xdp_zc_max_segs,
         };
     }
